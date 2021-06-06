@@ -1,0 +1,73 @@
+[{
+    'database':
+    '2020_kline_3m',
+    'times': [
+        timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}, {
+    'database':
+    '2019_kline_3m',
+    'times': [
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}, {
+    'database':
+    '2020_kline_5m',
+    'times': [
+        timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}, {
+    'database':
+    '2019_kline_5m',
+    'times': [
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}, {
+    'database':
+    '2020_kline_15m',
+    'times': [
+        timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}, {
+    'database':
+    '2019_kline_15m',
+    'times': [
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}, {
+    'database':
+    '2020_kline_30m',
+    'times': [
+        timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}, {
+    'database':
+    '2019_kline_30m',
+    'times': [
+        timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
+        timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
+    ],
+    'symbol':
+    'BTC-USDT'
+}]
