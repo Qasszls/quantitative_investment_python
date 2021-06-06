@@ -1,5 +1,0 @@
-requests==2.25.1
-websocket-client==0.57.0
-pika==1.2.0
-pymongo==3.11.3
-pandas==1.2.3
