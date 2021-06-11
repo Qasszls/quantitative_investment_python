@@ -1,31 +1,41 @@
 # -*- coding:UTF-8 -*-
 import emoji
 import threading
+import json
+import re
+import sys
 
+sys.path.append('..')
 from tqdm import tqdm
 
+from util.TimeStamp import TimeTamp
 from MarketCrawler import MarketCrawler
 from MySqlHandler import MySqlHandler
-from TimeStamp import TimeTamp
-from OsHandler import OsHandler
+from util.OsHandler import OsHandler
 
 
 class Searchkline(threading.Thread):
-    def __init__(self,
-                 threadID,
-                 marketCrawler,
-                 mySqlHandler,
-                 task=None,
-                 timeTamp=None):
+    def __init__(
+        self,
+        threadID,
+        marketCrawler,
+        mySqlHandler,
+        task=None,
+        timeTamp=None,
+    ):
         threading.Thread.__init__(self)
         self.task = task
         self.threadID = threadID
         self.marketCrawler = marketCrawler
         self.mySqlHandler = mySqlHandler
         self.timeTamp = timeTamp
+
         if not task:
             raise Exception('{}线程的任务不能为空'.format(threadID))
         self.instId = task['symbol']
+        self.bar = int(task['bar'])
+        self._bar_unit = task['_bar_unit']
+        self.limit = str(task['limit'])
 
     def get_divde(self, unit, _ms, bar):
         divde = None
@@ -45,16 +55,15 @@ class Searchkline(threading.Thread):
 
     def get_residue_limit(self, _bar_unit, _ms, bar, limit):
         # 获取总条数
-        _divide = self.get_divde(unit=_bar_unit, _ms=_ms, bar=bar)
+        _divide = self.get_divde(unit=_bar_unit, _ms=_ms, bar=int(bar))
         # 当剩余数据长度不足时，重新计算limit
-        if _divide <= 1:
-            return 1, _divide
-        elif _divide < limit:
+
+        if _divide <= 1 or _divide < int(limit):
             return _divide, _divide
         else:
             return limit, _divide
 
-    def crawler(self, tamp, limit='100', bar='15m'):
+    def crawler(self, tamp, limit, bar):
         """
         params1:爬虫程序
         params2:写入数据库
@@ -70,7 +79,7 @@ class Searchkline(threading.Thread):
         else:
             listLength = len(klineDatas[0]['data'])
             if listLength == 0:
-                print('\n', '数据暂无或已到尽头，上一时间戳为', tamp, '返回数据', klineDatas, '\n')
+                # print('\n', '数据暂无或已到尽头，上一时间戳为', tamp, '返回数据', klineDatas, '\n')
                 return True, tamp, listLength, []
             else:
                 data = klineDatas[0]['data']
@@ -91,9 +100,9 @@ class Searchkline(threading.Thread):
         # end_tamp = get_time_stamp('2018-12-31 23:59:59') * 1000
         end_tamp = times[1]
 
-        bar = 3  # 单次请求的时间长度
-        _bar_unit = 'm'  # 单次请求的时间粒度长单位 m:分 H:小时 D:天 W:周 M:月 Y:年
-        limit = 100  # 单次请求的条数
+        bar = self.bar  # 单次请求的时间长度
+        _bar_unit = self._bar_unit  # 单次请求的时间粒度长单位 m:分 H:小时 D:天 W:周 M:月 Y:年
+        limit = self.limit  # 单次请求的条数
         cumulative = 0  # 累计爬取了多少条
         total = self.get_divde(unit=_bar_unit,
                                _ms=int(start_tamp) - end_tamp,
@@ -102,31 +111,38 @@ class Searchkline(threading.Thread):
         # print('线程' + self.threadID + '开始下载数据  💾')
         # 打印 20到19年的行情数据
         while True:
-
+            # 更新limit
+            l, divide = self.get_residue_limit(_bar_unit,
+                                               int(start_tamp) - end_tamp, bar,
+                                               limit)
+            limit = l
             status, last_tamp, listLength, data = self.crawler(
                 str(start_tamp), bar=str(bar) + _bar_unit, limit=str(limit))
-            # 更新时间戳
-            start_tamp = last_tamp
+
             # 更新累计下载条数
             cumulative = cumulative + listLength
-            # 更新limit
-            limit, divide = self.get_residue_limit(_bar_unit,
-                                                   int(start_tamp) - end_tamp,
-                                                   bar, limit)
+            # 更新时间戳
+            start_tamp = last_tamp
+
             if not status:
-                print(
-                    emoji.emojize('您本次共爬取了' + str(total) +
-                                  ' 条数据, 爬取被中断, 十分抱歉   🥺'))
+                # print(
+                #     emoji.emojize('您本次共爬取了' + str(total) +
+                #                   ' 条数据, 爬取被中断, 十分抱歉   🥺'))
+                pbar.set_description(
+                    emoji.emojize('表 ' + self.threadID + ' 无剩余数据:被中断   ' +
+                                  self.timeTamp.get_time_normal(start_tamp) +
+                                  '   📆'))
+                pbar.update(total)
                 break
-            elif divide <= 0:
-                print(
-                    emoji.emojize('恭喜你爬取完成,   🥳   您本次共爬取了' + str(total) +
-                                  ' 条数据'))
-                break
-            elif listLength == 0:
-                print(
-                    emoji.emojize('您本次共爬取了' + str(total) +
-                                  ' 条数据, 虽未爬取完成, 但继续爬取  🤔'))
+            elif divide <= 0 or listLength == 0:
+                # print(
+                #     emoji.emojize('恭喜你爬取完成,   🥳   您本次共爬取了' + str(total) +
+                #                   ' 条数据'))
+                pbar.set_description(
+                    emoji.emojize('表 ' + self.threadID + ' 无剩余数据:已完成   ' +
+                                  self.timeTamp.get_time_normal(start_tamp) +
+                                  '   📆'))
+                pbar.update(total)
                 break
             else:
                 # 操作数据库
@@ -150,80 +166,13 @@ if __name__ == "__main__":
     timeTamp = TimeTamp()
     # 实例化命令行工具
     osHandler = OsHandler()
-    # 编辑任务队列
-    task_library = [{
-        'database':
-        '2020_kline_3m',
-        'times': [
-            timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }, {
-        'database':
-        '2019_kline_3m',
-        'times': [
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }, {
-        'database':
-        '2020_kline_5m',
-        'times': [
-            timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }, {
-        'database':
-        '2019_kline_5m',
-        'times': [
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }, {
-        'database':
-        '2020_kline_15m',
-        'times': [
-            timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }, {
-        'database':
-        '2019_kline_15m',
-        'times': [
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }, {
-        'database':
-        '2020_kline_30m',
-        'times': [
-            timeTamp.get_time_stamp('2020-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }, {
-        'database':
-        '2019_kline_30m',
-        'times': [
-            timeTamp.get_time_stamp('2019-12-31 23:59:59') * 1000,
-            timeTamp.get_time_stamp('2018-12-31 23:59:59') * 1000
-        ],
-        'symbol':
-        'BTC-USDT'
-    }]
+    # 取出任务队列 与 滤出队列
+    f = open(
+        '/Users/work/web/quantitative_investment_python/py/main/crawler/config.json',
+        'r')
+    config = json.load(f)
+    task_library = config['task_library']
+    task_filter = config['filter']
 
     # 实例化交易所
     marketCrawler = MarketCrawler(
@@ -245,20 +194,28 @@ if __name__ == "__main__":
 
     #请求池
     search = []
-    for i in range(len(task_library)):
-        # if i > 4:
-        #     break
-        data = task_library[i]
+
+    # 过滤任务列表，拿出预期数据 task_target
+    task_target = []
+    for item in task_library:
+        for filter_item in task_filter:
+            if re.search(filter_item, item['database']):
+                task_target.append(item)
+    # 遍历预期数据
+    for i in range(len(task_target)):
+        data = task_target[i]
         # 实例化线程对象
         search.append(
-            Searchkline(data['database'] + '_task',
-                        marketCrawler,
-                        mySqlHandler,
-                        data,
-                        timeTamp=timeTamp))
-        search[i].start()
+            Searchkline(
+                data['database'],
+                marketCrawler,
+                mySqlHandler,
+                data,
+                timeTamp=timeTamp,
+            ))
+        search[len(search) - 1].start()
     for item in search:
         item.join()
 
-    print("\n 全部结束 关机 \n")
-    osHandler.close_mac()
+    # print("\n 全部结束 关机 \n")
+    # osHandler.close_mac()

@@ -56,13 +56,35 @@ class MySqlHandler:
         self._close(cursor, conn)
         return text
 
+    def insert_trade_marks_data(self, data, database):
+        influence = 0
+        text = ''
+        cursor, conn = self._conn()
+        for item in data:
+            sql = "INSERT INTO "+database+"(id_tamp, open_price, high_price, lowest_price, close_price, vol, volCcy,checkSurplus,stopLoss,principal,property,tradingPrice,buyTraces,date) VALUES ('%s', '%s', '%s', '%s', '%s', '%s','%s', '%s', '%s','%s', '%s', '%s','%s','%s')"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      % \
+                    (item[0], item[1],item[2],item[3],item[4],item[5],item[6])
+
+            try:
+                # 执行sql语句
+                influence = cursor.execute(sql)
+                # 提交到数据库执行
+                conn.commit()
+                text = True, '数据写入:' + str(influence) + '条。'
+            except Exception as e:
+                # 如果发生错误则回滚
+                conn.rollback()
+                text = False, str(e) + str(influence)
+
+        self._close(cursor, conn)
+        return text
+
     def insert_kline_data(self, data, database):
         influence = 0
         text = ''
         cursor, conn = self._conn()
         for item in data:
-            sql = "INSERT INTO "+database+"(id_Tamp, marketCollection) VALUES ('%s', '%s')"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      % \
-                    (item[0], ','.join(item))
+            sql = "INSERT INTO "+database+"(id_tamp, open_price, high_price, lowest_price, close_price, vol, volCcy) VALUES ('%s', '%s', '%s', '%s', '%s', '%s','%s')"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      % \
+                    (item[0], item[1],item[2],item[3],item[4],item[5],item[6])
 
             try:
                 # 执行sql语句
