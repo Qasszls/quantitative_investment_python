@@ -135,41 +135,53 @@ class SimpleMacd():
         dif = todayMacd['dif']
         # 研判模块
         if self.step == 0:
+            self._reset()
             self._step_0(todayMacd)
             return False
         elif self.step == 1:
-            # 底部记录
+            # 首次水下死叉的波谷的线价记录
             self.price_lowest_record(close_price, 'first_confirmation')
             self.dif_lowest_record(dif, 'first_confirmation')
             self._step_1(todayMacd)
             return False
         elif self.step == 2:
+            # 回抽零轴前研判
             self._step_2(todayMacd)
             return False
         elif self.step == 3:
-            # 底部记录
+            # 记录本次回抽后波谷的价线情况
             self.price_lowest_record(close_price, 'again_confirmation')
             self.dif_lowest_record(dif, 'again_confirmation')
+            # 走研判内容
             self._step_3(todayMacd)
             if self.step == 2:
+                # print('dif', self.lowest_dif, 'price', self.lowest_price,
+                #       'date', self.timeTamp.get_time_normal(med_tamp))
+
+                # 回抽零轴后波谷可能 深于【首次死叉】时的波谷，故尝试记录一下
                 self.price_lowest_record(
                     self.lowest_price['again_confirmation'],
                     'first_confirmation')
                 self.dif_lowest_record(self.lowest_dif['again_confirmation'],
                                        'first_confirmation')
+
+                # 清空过往回抽后波谷的价线记录
+                self._reset('again_confirmation')
                 return False
             elif self.step == 9999:
+                # print('dif', self.lowest_dif, 'price', self.lowest_price,
+                #       'date', self.timeTamp.get_time_normal(med_tamp))
                 return True
         elif self.step == 9999:
             self._reset()
-            self._step_2(todayMacd)
+            self._step_0(todayMacd)
             return False
 
     # 工具函数
 
     # 是否在水下
     def _is_under_water(self, dif, dea):
-        return dif < 0 and dea < 0
+        return dif < 0 or dea < 0
 
     # 在水下 是否金叉
     def _is_golden_cross(self, macd):
@@ -185,12 +197,15 @@ class SimpleMacd():
         return self.lowest_price['again_confirmation'] < self.lowest_price[
             'first_confirmation']
 
-    def _reset(self):
-        self.step = 2
-        self.lowest_price['first_confirmation'] = None
-        self.lowest_price['again_confirmation'] = None
-        self.lowest_dif['first_confirmation'] = None
-        self.lowest_dif['again_confirmation'] = None
+    def _reset(self, target='all'):
+        if target == 'all':
+            self.lowest_price['first_confirmation'] = None
+            self.lowest_price['again_confirmation'] = None
+            self.lowest_dif['first_confirmation'] = None
+            self.lowest_dif['again_confirmation'] = None
+        else:
+            self.lowest_price[target] = None
+            self.lowest_dif[target] = None
 
     # 步骤 0 水下生死叉
     def _step_0(self, macdDist):
