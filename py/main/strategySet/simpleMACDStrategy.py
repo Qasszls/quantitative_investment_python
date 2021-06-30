@@ -62,7 +62,7 @@ from util.TimeStamp import TimeTamp
 
 
 class SimpleMacd():
-    def __init__(self, close_price, lowest_dif, medDF, advDF):
+    def __init__(self, close_price, lowest_dif, medDF, advDF, mode, odds):
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -74,6 +74,8 @@ class SimpleMacd():
         self.medDF = medDF.astype(float)
         self.advDF = advDF
         self.step = 0
+        self.mode = mode
+        self.odds = odds
         self.timeTamp = TimeTamp()
 
     def runStrategy(self, close_price, med_tamp, index, onCalculate,
@@ -88,8 +90,8 @@ class SimpleMacd():
         mediumStatus = self.medium_read(close_price, medDF_line, med_tamp)
         if mediumStatus:
             # 实例化核心算法对象----高级别
-            advMacdIndex = self._get_syn_timestamp(adv_tamp_list, med_tamp)
-            advancedStatus = self.advance_read(self.advDF.loc[advMacdIndex])
+            # advMacdIndex = self._get_syn_timestamp(adv_tamp_list, med_tamp)
+            # advancedStatus = self.advance_read(self.advDF.loc[advMacdIndex])
             completed({
                 'mediumStatus': mediumStatus,
                 'advancedStatus': True,
@@ -110,25 +112,25 @@ class SimpleMacd():
             })
 
     # 获得同一时间的时间戳 时间戳同步
-    def _get_syn_timestamp(self, advTampList, medTamp):
-        index = 0
-        for item in advTampList:
-            diff = int(medTamp) - int(item)
-            # 兼容时间差为：
-            # if diff >= 0 and diff <= 86400000:
-            #     return index
-            if diff >= 0 and diff <= 3600000:
-                return index
-            index = index + 1
+    # def _get_syn_timestamp(self, advTampList, medTamp):
+    #     index = 0
+    #     for item in advTampList:
+    #         diff = int(medTamp) - int(item)
+    #         # 兼容时间差为：
+    #         # if diff >= 0 and diff <= 86400000:
+    #         #     return index
+    #         if diff >= 0 and diff <= 3600000:
+    #             return index
+    #         index = index + 1
 
-    # 高级别研判
-    def advance_read(self, todayMacd):
-        # 在水上做多
-        if self._is_under_water(todayMacd['dif'], todayMacd['dea']):
-            return False
-        # 在水下的再研判 没有做
-        else:
-            return True
+    # # 高级别研判
+    # def advance_read(self, todayMacd):
+    #     # 在水上做多
+    #     if self._is_under_water(todayMacd['dif'], todayMacd['dea']):
+    #         return False
+    #     # 在水下的再研判 没有做
+    #     else:
+    #         return True
 
     # 本级别研判
     def medium_read(self, close_price, todayMacd, med_tamp):
@@ -186,6 +188,32 @@ class SimpleMacd():
     # 在水下 是否金叉
     def _is_golden_cross(self, macd):
         return macd > 0
+
+    #非严格模式的 白线收盘价是否背离
+    def _loose_deviate_from(self):
+        odds = self.odds
+
+        # 内部函数
+        def _get_odds(mode='dif'):
+            if mode == 'dif':
+                first = self.lowest_dif['first_confirmation']
+                again = self.lowest_dif['again_confirmation']
+                return abs((first - again) / again) <= odds
+            else:
+                first = self.lowest_price['first_confirmation']
+                again = self.lowest_price['again_confirmation']
+                return abs((again - first) / first) <= odds
+
+        if self._is_white_line_up() and self._is_down_channel():
+            return True
+        elif self._is_white_line_up() and _get_odds('price'):
+            return True
+        elif self._is_down_channel() and _get_odds('dif'):
+            return True
+        else:
+            return False
+
+        # 白线波谷上移 或 收盘价创新低
 
     # 白线是否上移
     def _is_white_line_up(self):
@@ -255,9 +283,12 @@ class SimpleMacd():
         是否仍在空头市场
             等待它的金叉状态 next
         """
+
         if self._is_under_water(macdDist['dif'], macdDist['dea']):
             if self._is_golden_cross(macdDist['macd']):
                 if self._is_white_line_up() and self._is_down_channel():
+                    self.step = 9999
+                elif self.mode == 'strict' and self._loose_deviate_from():
                     self.step = 9999
                 else:
                     self.step = 2

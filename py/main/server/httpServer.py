@@ -31,13 +31,16 @@ class Resquest(BaseHTTPRequestHandler):
             checkSurplus = req_data['stop_profit']
             stopLoss = req_data['stop_loss']
             principal = req_data['cash']
+            _name = req_data['name']
+            mode = 'strict'
+            odds = 0.05
             req_date = []
             if req_data['start_time'] != '' and req_data['end_time'] != '':
                 req_date = [req_data['start_time'], req_data['end_time']]
 
             self.wfile.write(json.dumps(result_search).encode())
-            dataBackTesting.run_test(checkSurplus, stopLoss, principal,
-                                     req_date)
+            dataBackTesting.run_test(checkSurplus, stopLoss, principal, mode,
+                                     odds, _name, req_date)
         if (re.search('/strategySet/list', self.path) != None):
             res_list = dataBackTesting.get_record_list('table_record')
             result_list['data'] = res_list
@@ -58,7 +61,7 @@ class Resquest(BaseHTTPRequestHandler):
         if (re.search('/strategySet/detail', self.path) != None):
             id = post_data['id']
             res_dict = dataBackTesting.search_market_data(id)
-            result_list['data'] = res_dict[0:1000]
+            result_list['data'] = res_dict
             self.wfile.write(json.dumps(result_list).encode())
 
     def connetSql(self):

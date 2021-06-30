@@ -28,6 +28,9 @@ class Investment(threading.Thread):
                  medDF,
                  advDF,
                  table_name,
+                 mode,
+                 odds,
+                 _name,
                  threadID=None):
         """
         初始化
@@ -48,10 +51,13 @@ class Investment(threading.Thread):
         self.stopLoss = float(stopLoss)
         self.principal = int(float(principal))
         self.table_name = table_name
+        self.mode = mode
+        self.odds = odds
+        self.name = _name
         # 命名进程
         if not threadID:
             self.threadID = str(int(self.checkSurplus * 100)) + '_' + str(
-                int(self.stopLoss * 100)) + '_' + str(self.principal)
+                int(self.stopLoss * 100)) + '_' + str(self.principal) + '_'+self.name
         else:
             self.threadID = threadID
         # 内部变量
@@ -72,7 +78,7 @@ class Investment(threading.Thread):
         self.pbar = tqdm(total=(len(self.klineMediumLevel) - 1))
         simpleMacd = SimpleMacd(self.klineMediumLevel.loc[0]['close_price'],
                                 self.medDF.loc[0]['dif'], self.medDF,
-                                self.advDF)
+                                self.advDF, self.mode, self.odds)
         for index in range(len(self.medDF['macd']) - 1):
             simpleMacd.runStrategy(
                 self.klineMediumLevel.loc[index]['close_price'],
@@ -179,7 +185,7 @@ class Investment(threading.Thread):
     def _is_checkSurplus(self, close_price, tamp):
         # 盈亏比
         if self.property != 0:
-            odds = ((close_price - self.tradingPrice) / self.tradingPrice) * 10
+            odds = ((close_price - self.tradingPrice) / self.tradingPrice)
             if odds >= 0 and odds >= self.checkSurplus:
                 return True
             else:
@@ -189,8 +195,7 @@ class Investment(threading.Thread):
 
     def _is_sotpLoss(self, close_price):
         if self.property != 0:
-            failure = (
-                (close_price - self.tradingPrice) / self.tradingPrice) * 10
+            failure = ((close_price - self.tradingPrice) / self.tradingPrice)
             if failure <= 0 and abs(failure) >= self.stopLoss:
                 return True
             else:

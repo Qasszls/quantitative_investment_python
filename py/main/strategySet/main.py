@@ -123,7 +123,14 @@ class DataBackTesting:
         else:
             return self.sqlHandler.select_trade_marks_data(table_name)
 
-    def run_test(self, checkSurplus, stopLoss, principal, time=[]):
+    def run_test(self,
+                 checkSurplus,
+                 stopLoss,
+                 principal,
+                 mode,
+                 odds,
+                 _name,
+                 time=[]):
 
         # 查询该表是否存在
         if len(time) > 0:
@@ -135,6 +142,8 @@ class DataBackTesting:
             table_name = '15m_60m_' + str(int(
                 float(checkSurplus) * 100)) + '_' + str(
                     int(float(stopLoss) * 100))
+        if _name != '':
+            table_name = table_name + '_' + _name
         search_res = self.search_table(table_name)
 
         if search_res['status']:
@@ -144,23 +153,17 @@ class DataBackTesting:
         else:
             # 首先按照时间区段解析行情数据
             market_data_res = self._get_market_data(
-                ['2020_kline_15m', '2020_kline_1H'], time)
+                ['2020_kline_1H', '2020_kline_1H'], time)
             if market_data_res:
                 # 表不存在 创建表
                 create_res = self.sqlHandler.create_trade_marks_table(
                     table_name)
                 if create_res['status']:
                     # 创建表成功，执行回测
-                    self._run_investment(
-                        checkSurplus,
-                        stopLoss,
-                        principal,
-                        table_name,
-                        self.klineMediumLevel,
-                        self.klineAdvancedLevel,
-                        self.medDF,
-                        self.advDF,
-                    )
+                    self._run_investment(checkSurplus, stopLoss, principal,
+                                         table_name, self.klineMediumLevel,
+                                         self.klineAdvancedLevel, self.medDF,
+                                         self.advDF, mode, odds, _name)
 
     # 查询指定表，返回表头列表
     def _get_table_column(self, table_name):
@@ -173,21 +176,13 @@ class DataBackTesting:
                 column.append(item[0])
         return column
 
-    def _run_investment(
-        self,
-        checkSurplus,
-        stopLoss,
-        principal,
-        table_name,
-        klineMediumLevel,
-        klineAdvancedLevel,
-        medDF,
-        advDF,
-    ):
+    def _run_investment(self, checkSurplus, stopLoss, principal, table_name,
+                        klineMediumLevel, klineAdvancedLevel, medDF, advDF,
+                        mode, odds, _name):
         # 遍历并插入数据
         investment = Investment(checkSurplus, stopLoss, principal,
                                 klineMediumLevel, klineAdvancedLevel, medDF,
-                                advDF, table_name)
+                                advDF, table_name, mode, odds, _name)
         # 返回要写入table_record表的内容
         investment.start()
         # 更新record表内容 table_name
