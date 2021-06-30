@@ -12,6 +12,8 @@ class TimeTamp:
         return timeStamp
 
     def get_time_normal(self, tamp):
+        if type(tamp) != type(1):
+            tamp = int(tamp)
         times = time.localtime(int(tamp) / 1000)
         otherStyleTime = time.strftime("%Y-%m-%d %H:%M:%S", times)
         return otherStyleTime

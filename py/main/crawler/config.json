@@ -1,135 +1,120 @@
 {
   "task_library": [
     {
-      "database": "2020_kline_1m",
+      "table": "2020_kline_1m",
       "times": [1609430399000, 1577807999000],
       "bar": "1",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2019_kline_1m",
+      "table": "2019_kline_1m",
       "times": [1577807999000, 1546271999000],
       "bar": "1",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2020_kline_3m",
+      "table": "2020_kline_3m",
       "times": [1609430399000, 1577807999000],
       "bar": "3",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2019_kline_3m",
+      "table": "2019_kline_3m",
       "times": [1577807999000, 1546271999000],
       "bar": "3",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2020_kline_5m",
+      "table": "2020_kline_5m",
       "times": [1609430399000, 1577807999000],
       "bar": "5",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2019_kline_5m",
+      "table": "2019_kline_5m",
       "times": [1577807999000, 1546271999000],
       "bar": "5",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2020_kline_15m",
+      "table": "2020_kline_15m",
       "times": [1609430399000, 1577807999000],
       "bar": "15",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2019_kline_15m",
+      "table": "2019_kline_15m",
       "times": [1577807999000, 1546271999000],
       "bar": "15",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2020_kline_30m",
+      "table": "2020_kline_30m",
       "times": [1609430399000, 1577807999000],
       "bar": "30",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2019_kline_30m",
+      "table": "2019_kline_30m",
       "times": [1577807999000, 1546271999000],
       "bar": "30",
       "_bar_unit": "m",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     { 
-      "database": "2020_kline_1H",
+      "table": "2020_kline_1H",
       "times": [1609430399000, 1577807999000], 
       "bar": "1",
       "_bar_unit": "H",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2019_kline_1H",
+      "table": "2019_kline_1H",
       "times": [1577807999000, 1546271999000],
       "bar": "1",
       "_bar_unit": "H",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2020_kline_1D",
+      "table": "2020_kline_1D",
       "times": [1609430399000, 1577807999000],
       "bar": "1",
       "_bar_unit": "D",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2019_kline_1D",
+      "table": "2019_kline_1D",
       "times": [1577807999000, 1546271999000],
       "bar": "1",
       "_bar_unit": "D",
-      "limit": "100",
-      "symbol": "BTC-USDT"
+      "limit": "100"
     },
     {
-      "database": "2020_kline_1W",
+      "table": "2020_kline_1W",
       "times": [1609430399000, 1577807999000],
       "bar": "1",
       "_bar_unit": "W",
-      "limit": "1",
-      "symbol": "BTC-USDT"
+      "limit": "1"
     },
     {
-      "database": "2019_kline_1W",
+      "table": "2019_kline_1W",
       "times": [1577807999000, 1546271999000],
       "bar": "1",
       "_bar_unit": "W",
-      "limit": "1",
-      "symbol": "BTC-USDT"
+      "limit": "1"
     }
   ],
-  "filter":["1H","15m"],
+  "filter":["15m","1H"],
+  "DBName":"BTC-USDT_kline",
   "PLATFORMS": {
     "okex": {
       "access_key": "7dbf6048-5661-4295-9298-d4e9da8b9609",
@@ -139,6 +124,6 @@
   "DINGTALK": "",
   "strategy_name": "double_ma_strategy",
   "platform": "OKEX",
-  "symbol": "EOS-USDT",
+  "symbol": "BTC-USDT",
   "kline_interval": "5m"
 }
