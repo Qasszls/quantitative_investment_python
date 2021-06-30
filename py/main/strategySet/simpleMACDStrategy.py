@@ -47,70 +47,79 @@ for item in kline:
     # 止盈 大于当前价格 22%
     
 """
+from os import close
 import sys
 import talib
 import pandas as pd
+import emoji
 
 import time
 
 talib.OBV
 
+sys.path.append('..')
+from util.TimeStamp import TimeTamp
+
 
 class SimpleMacd():
-    def __init__(self, close_price, lowest_dif):
-        self.lowest_price = close_price
-        self.lowest_dif = lowest_dif
+    def __init__(self, close_price, lowest_dif, medDF, advDF):
+        self.lowest_price = {
+            'first_confirmation': None,
+            'again_confirmation': None
+        }
+        self.lowest_dif = {
+            'first_confirmation': None,
+            'again_confirmation': None
+        }
+        self.medDF = medDF.astype(float)
+        self.advDF = advDF
         self.step = 0
+        self.timeTamp = TimeTamp()
 
-    def run(self, klineMediumLevel, klineAdvancedLevel, medDF, advDF,
-            onCalculate, completed):
-        for index in range(len(medDF['macd'] - 1)):
-            # 初始化变量
-            close_price = klineMediumLevel.loc[index]['close_price']  # 获取当日收盘价
-            med_tamp = klineMediumLevel.loc[index]['id_tamp']  # 获取本级别的时间戳
-            medDF_line = medDF.loc[index]  # 获取本级别的当日macd
-            adv_tamp = advDF['id_tamp']  # 获取高级别的时间戳
-            # 计算中 钩子
-            onCalculate({'index': index})
+    def runStrategy(self, close_price, med_tamp, index, onCalculate,
+                    completed):
+        # 初始化变量
+        medDF_line = self.medDF.loc[index]  # 获取本级别的当日macd集合
+        adv_tamp_list = self.advDF['id_tamp'].values  # 获取高级别的时间戳
+        # 计算中 钩子
+        onCalculate({'index': index})
 
-            # 核心算法，是否做多，本级别确认
-            mediumStatus = self.medium_read(close_price, medDF_line)
-
-            if mediumStatus:
-                # print('本级别确认')
-                # 实例化核心算法对象----高级别
-                advMacdIndex = self._get_syn_timestamp(adv_tamp, med_tamp)
-                advancedStatus = self.advance_read(advDF.loc[advMacdIndex])
-                completed({
-                    'mediumStatus': mediumStatus,
-                    'advancedStatus': advancedStatus,
-                    'klineMediumLevel': klineMediumLevel,
-                    'klineAdvancedLevel': klineAdvancedLevel,
-                    'medDF': medDF,
-                    'advDF': advDF,
-                    'index': index
-                })
-            else:
-                # 流程跑完 钩子
-                completed({
-                    'mediumStatus': mediumStatus,
-                    'advancedStatus': None,
-                    'klineMediumLevel': klineMediumLevel,
-                    'klineAdvancedLevel': klineAdvancedLevel,
-                    'medDF': medDF,
-                    'advDF': advDF,
-                    'index': index
-                })
+        # 核心算法，是否做多，本级别确认
+        mediumStatus = self.medium_read(close_price, medDF_line, med_tamp)
+        if mediumStatus:
+            # 实例化核心算法对象----高级别
+            advMacdIndex = self._get_syn_timestamp(adv_tamp_list, med_tamp)
+            advancedStatus = self.advance_read(self.advDF.loc[advMacdIndex])
+            completed({
+                'mediumStatus': mediumStatus,
+                'advancedStatus': True,
+                'close_price': close_price,
+                'tamp': med_tamp,
+                'index': index,
+                "step": self.step
+            })
+        else:
+            # 流程跑完 钩子
+            completed({
+                'mediumStatus': mediumStatus,
+                'advancedStatus': True,
+                'close_price': close_price,
+                'tamp': med_tamp,
+                'index': index,
+                "step": self.step
+            })
 
     # 获得同一时间的时间戳 时间戳同步
-    def _get_syn_timestamp(self, advTamp, medTamp):
-        advTampList = advTamp.values
-        for index in range(len(advTampList)):
-            diff = int(medTamp) - int(advTampList[index])
-
-            if (diff > 0 and diff <= 3600000) or (diff >= 0
-                                                  and diff < 3600000):
+    def _get_syn_timestamp(self, advTampList, medTamp):
+        index = 0
+        for item in advTampList:
+            diff = int(medTamp) - int(item)
+            # 兼容时间差为：
+            # if diff >= 0 and diff <= 86400000:
+            #     return index
+            if diff >= 0 and diff <= 3600000:
                 return index
+            index = index + 1
 
     # 高级别研判
     def advance_read(self, todayMacd):
@@ -122,30 +131,39 @@ class SimpleMacd():
             return True
 
     # 本级别研判
-    def medium_read(self, close_price, todayMacd):
-
-        #初始化模块
+    def medium_read(self, close_price, todayMacd, med_tamp):
         dif = todayMacd['dif']
-
         # 研判模块
         if self.step == 0:
             self._step_0(todayMacd)
+            return False
         elif self.step == 1:
+            # 底部记录
+            self.price_lowest_record(close_price, 'first_confirmation')
+            self.dif_lowest_record(dif, 'first_confirmation')
             self._step_1(todayMacd)
+            return False
         elif self.step == 2:
             self._step_2(todayMacd)
+            return False
         elif self.step == 3:
+            # 底部记录
+            self.price_lowest_record(close_price, 'again_confirmation')
+            self.dif_lowest_record(dif, 'again_confirmation')
             self._step_3(todayMacd)
-        elif self.step == 4:
-            self._step_4(todayMacd, close_price)
-        elif self.step == 5:
-            return True
-
-        # 记录模块 价格 与 dif 低点
-        if dif < self.lowest_dif:
-            self.lowest_dif = dif
-        if close_price < self.lowest_price:
-            self.lowest_price = close_price
+            if self.step == 2:
+                self.price_lowest_record(
+                    self.lowest_price['again_confirmation'],
+                    'first_confirmation')
+                self.dif_lowest_record(self.lowest_dif['again_confirmation'],
+                                       'first_confirmation')
+                return False
+            elif self.step == 9999:
+                return True
+        elif self.step == 9999:
+            self._reset()
+            self._step_2(todayMacd)
+            return False
 
     # 工具函数
 
@@ -158,15 +176,42 @@ class SimpleMacd():
         return macd > 0
 
     # 白线是否上移
-    def _is_white_line_up(self, dif, lowest_dif):
-        return dif > lowest_dif
+    def _is_white_line_up(self):
+        return self.lowest_dif['again_confirmation'] > self.lowest_dif[
+            'first_confirmation']
 
     # 收盘价是否低中低
-    def _is_down_channel(self, lowest_price, close_price):
-        return lowest_price >= close_price
+    def _is_down_channel(self):
+        return self.lowest_price['again_confirmation'] < self.lowest_price[
+            'first_confirmation']
+
+    def _reset(self):
+        self.step = 2
+        self.lowest_price['first_confirmation'] = None
+        self.lowest_price['again_confirmation'] = None
+        self.lowest_dif['first_confirmation'] = None
+        self.lowest_dif['again_confirmation'] = None
 
     # 步骤 0 水下生死叉
     def _step_0(self, macdDist):
+        """ 死叉 ==>
+        等待进入空头市场
+            等待空头市场的死叉状态 next
+        """
+        if self._is_under_water(macdDist['dif'], macdDist['dea']):
+            if not self._is_golden_cross(macdDist['macd']):
+                self.step = 1
+            else:
+                self.step = 0
+        else:
+            self.step = 0
+
+    # 步骤 1 死后返生叉
+    def _step_1(self, macdDist):
+        """ 死叉 ==> 金叉
+        是否在空头市场
+            等待它的金叉状态 next
+        """
         if self._is_under_water(macdDist['dif'], macdDist['dea']):
             if self._is_golden_cross(macdDist['macd']):
                 self.step = 2
@@ -175,15 +220,12 @@ class SimpleMacd():
         else:
             self.step = 0
 
-    # 步骤 1 死后返生叉
-    def _step_1(self, macdDist):
-        if self._is_golden_cross(macdDist['macd']):
-            self.step = 2
-        else:
-            self.step = 1
-
     # 步骤 2 回抽零轴 或 出水重生
     def _step_2(self, macdDist):
+        """ 死叉 ==> 金叉 ==> 死叉
+        是否仍在空头市场
+            等待它的死叉状态 next
+        """
         if self._is_under_water(macdDist['dif'], macdDist['dea']):
             if not self._is_golden_cross(macdDist['macd']):
                 self.step = 3
@@ -194,16 +236,32 @@ class SimpleMacd():
 
     # 步骤 3 金叉确认 蓄势登场
     def _step_3(self, macdDist):
-        if self._is_golden_cross(macdDist['macd']):
-            self.step = 4
+        """ 死叉 ==> 金叉 ==> 死叉 ==> 金叉 与 背离
+        是否仍在空头市场
+            等待它的金叉状态 next
+        """
+        if self._is_under_water(macdDist['dif'], macdDist['dea']):
+            if self._is_golden_cross(macdDist['macd']):
+                if self._is_white_line_up() and self._is_down_channel():
+                    self.step = 9999
+                else:
+                    self.step = 2
+            else:
+                self.step = 3
         else:
-            self.step = 3
+            self.step = 0
 
-    # 步骤 4 形危而势强
-    def _step_4(self, tMDist, close_price):
-        if self._is_white_line_up(tMDist['dif'],
-                                  self.lowest_dif) and self._is_down_channel(
-                                      close_price, self.lowest_price):
-            self.step = 5
+    #背离记录模块 价格与dif
+    def price_lowest_record(self, close_price, time_quantum):
+        if self.lowest_price[time_quantum] == None:
+            self.lowest_price[time_quantum] = close_price
         else:
-            self.step = 2
+            if close_price < self.lowest_price[time_quantum]:
+                self.lowest_price[time_quantum] = close_price
+
+    def dif_lowest_record(self, dif, time_quantum):
+        if self.lowest_dif[time_quantum] == None:
+            self.lowest_dif[time_quantum] = dif
+        else:
+            if dif < self.lowest_dif[time_quantum]:
+                self.lowest_dif[time_quantum] = dif

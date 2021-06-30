@@ -1,135 +1,107 @@
 # -*- coding:UTF-8 -*-
 
-import talib
 import pandas as pd
 import numpy as np
-import time
+import json
 import sys
+import os
+import asyncio
+import time
+import re
+
+sys.path.append('..')
+if re.search('/main/server', os.getcwd()):
+    sys.path.append(
+        '/Users/work/web/quantitative_investment_python/py/main/strategySet')
+# from util.OsHandler import OsHandler
+from sqlHandler import SqlHandler
+from investment import Investment
+
 # import pyecharts.options as opts
 # from pyecharts.charts import Line
 
-sys.path.append("..")
-from util.TimeStamp import TimeTamp
-from simpleMACDStrategy import SimpleMacd
-from draw import DrawMacd
 
+class DataBackTesting:
+    def __init__(self):
+        self.sqlHandler = SqlHandler(
+            ip='127.0.0.1',
+            userName='root',
+            userPass='qass-utf-8',
+            DBName='BTC-USDT_kline',
+            charset='utf8',
+        )
 
-class Main:
-    def __init__(self, checkSurplus, stopLoss, principal):
-        """
-        初始化
-            止盈率
-            止损率
-            本金
-            资产(个)
-            交易价格
-            购币痕迹
-        """
-        self.checkSurplus = checkSurplus
-        self.stopLoss = stopLoss
-        self.principal = principal
-        #内部变量
-        self.property = 0
-        self.tradingPrice = 0
-        self.buyTraces = 0
-        self.timeTamp = TimeTamp()
+    # 根据列表id反查列表名；清空总表对应数据；删除对应表
+    def delete_market_data(self, id):
+        table_name = self.sqlHandler.select_table_id(id)['result'][0][1]
+        res = self.sqlHandler.delete_table(table_name)
+        if res['status']:
+            return self.sqlHandler.delete_table_record('table_record', id)
 
-    def runBackTest(self, klineMediumLevel, klineAdvancedLevel, medDF, advDF):
-        # 实例化核心算法对象----本级别
-        simpleMacd = SimpleMacd(klineMediumLevel.loc[0]['close_price'],
-                                medDF.loc[0]['dif'])
-        simpleMacd.run(klineMediumLevel, klineAdvancedLevel, medDF, advDF,
-                       self.onCalculate, self.completed)
-        # 钩子
-        print(
-            '剩余本金：', self.principal, '元。剩余币：', self.property, '元。剩余价值：',
-            self.principal +
-            (self.property *
-             klineMediumLevel.loc[len(klineMediumLevel) - 1]['close_price']))
+    # 根据列表id反差列表名；根据列表名查询列表数据
+    def search_market_data(self, id):
+        res = self.sqlHandler.select_table_id(id)
+        if res['status']:
+            table_name = res['result'][0][1]
+            table_data = self.sqlHandler.select_trade_marks_data(
+                table_name)['result']
+            df = pd.DataFrame(table_data)
+            df.columns = self._get_table_column(table_name)
+        return df.to_dict(orient='records')
 
-    #钩子函数 计算中
-    def onCalculate(self, res):
-        None
-
-    #钩子函数 计算完成
-    def completed(self, res):
-        index = res['index']
-        klineMediumLevel = res['klineMediumLevel']
-        close_price = klineMediumLevel.loc[index]['close_price']
-        med_tamp = klineMediumLevel.loc[index]['id_tamp']
-        advancedStatus = res['advancedStatus']
-        if advancedStatus:
-            #买入 钩子
-            if self.principal >= close_price:
-                self.allBuy(close_price)
-        # 止盈止损
-        if self._is_checkSurplus(close_price, med_tamp):
-            self.allSell(klineMediumLevel.loc[index][4])
-        elif self._is_sotpLoss(close_price):
-            self.allSell(klineMediumLevel.loc[index][4])
-        #把用户与行情数据存入
-
-    def _is_checkSurplus(self, close_price, tamp):
-        # 盈亏比
-        if self.property != 0:
-            odds = ((close_price - self.tradingPrice) / self.tradingPrice)
-            print(self.timeTamp.get_time_normal(tamp), '止盈率',
-                  format(self.checkSurplus * 100, '.2f') + '%', '止损率',
-                  format(self.stopLoss * 100, '.2f') + '%',
-                  '赔率' + format(odds * 100, '.5f') + '%', '总资产：',
-                  self.principal + self.property * close_price)
-            # time.sleep(0.31)
-            if odds >= 0 and odds >= self.checkSurplus:
-                return odds >= self.checkSurplus
-            else:
-                return False
+    # 返回查询列表区块
+    def get_record_list(self, table_name):
+        # sql 获取列表数据
+        list_res = self.sqlHandler.select_test_record_list(table_name)
+        if len(list_res['result']) > 0:
+            # sql 获取列名数据
+            column = self._get_table_column(table_name)
+            df = pd.DataFrame(list_res['result'])
+            df.columns = column
+            if list_res['status']:
+                return df.to_dict('records')
         else:
-            # 观察钩子
-            if self.buyTraces > 0:
-                odds = ((close_price - self.tradingPrice) / self.tradingPrice)
-                print(self.timeTamp.get_time_normal(tamp), '比特币价格',
-                      close_price, '上次交易价格', self.tradingPrice, '拿住后赔率',
-                      format(odds * 100, '.5f') + '%', '总资产：', self.principal)
-                # time.sleep(0.11)
+            print('未查得')
+            return []
+
+    # 跑回测代码区块
+    def _get_market_data(self, table_name, time=[]):
+        res1 = self.search_table(table_name[0], time)
+        res2 = self.search_table(table_name[1], time)
+
+        if res1['status'] and res1['result'] and res2['status'] and res2[
+                'result']:
+            self.klineMediumLevel = self._get_kline_data(
+                res1['result'], table_name[0])
+            self.klineAdvancedLevel = self._get_kline_data(
+                res2['result'], table_name[1])
+            # 获取样本数据
+            self.medDF = self._get_MACD(self.klineMediumLevel['close_price'],
+                                        self.klineMediumLevel['id_tamp'])
+            self.advDF = self._get_MACD(self.klineAdvancedLevel['close_price'],
+                                        self.klineAdvancedLevel['id_tamp'])
+            return True
+        else:
+            print(res1['text'], res2['text'], '表不存在或为空')
             return False
 
-    def _is_sotpLoss(self, close_price):
-        if self.property != 0:
-            failure = ((close_price - self.tradingPrice) / self.tradingPrice)
-            if failure <= 0 and failure <= self.stopLoss:
-                return abs(failure) >= self.stopLoss
-            else:
-                return False
-        else:
-            return False
+    def _get_kline_data(self, data, table_name):
+        df = pd.DataFrame(list(data))
+        df.columns = self._get_table_column(table_name)
+        #所有内容转化为数值型
+        df = df.astype(float)
+        return df
 
-    def get_kline_fromCsv(self, path):
-        return pd.read_csv(path)
-
-    def allBuy(self, mediumPrice):
-        self.tradingPrice = mediumPrice
-        self.property = self.principal // mediumPrice + self.property
-        self.principal = self.principal - (self.property * mediumPrice)
-        self.buyTraces = self.buyTraces + 1
-        print('买入后剩余本金', self.principal, '交易价格', self.tradingPrice, '购买的比特币',
-              self.property)
-
-    def allSell(self, mediumPrice):
-        self.tradingPrice = mediumPrice
-        self.principal = self.property * mediumPrice + self.principal
-        self.property = 0
-        print('卖出后剩余本金', self.principal, '交易价格', self.tradingPrice)
-
-    def get_MACD(self,
-                 price,
-                 timeTamps,
-                 fastperiod=12,
-                 slowperiod=26,
-                 signalperiod=9):
+    def _get_MACD(self,
+                  price,
+                  timeTamps,
+                  fastperiod=12,
+                  slowperiod=26,
+                  signalperiod=9):
         """
-        入参：价格和基准等
-        出参：dataFrame格式的数据结构
-        """
+            入参：价格和基准等
+            出参：dataFrame格式的数据结构
+            """
         ewma12 = price.ewm(span=fastperiod).mean()
         ewma60 = price.ewm(span=slowperiod).mean()
         dif = ewma12 - ewma60
@@ -145,21 +117,84 @@ class Main:
             'id_tamp': timeTamps.values
         })
 
+    def search_table(self, table_name, time=[]):
+        if len(time) > 0:
+            return self.sqlHandler.select_trade_marks_data(table_name, time)
+        else:
+            return self.sqlHandler.select_trade_marks_data(table_name)
 
-if __name__ == "__main__":
-    kline_15m_SamplePath = '../../kline_csv/2020_kline_15m.csv'  # 样本地址1
-    kline_1H_SamplePath = '../../kline_csv/2020_kline_1H.csv'  # 样本地址2
-    main = Main(0.18, 0.08, 1000000)
-    #读取dataFrame变量
-    klineMediumLevel = main.get_kline_fromCsv(kline_15m_SamplePath)
-    klineAdvancedLevel = main.get_kline_fromCsv(kline_1H_SamplePath)
-    medDF = main.get_MACD(klineMediumLevel['close_price'],
-                          klineMediumLevel['id_tamp'])
-    advDF = main.get_MACD(klineAdvancedLevel['close_price'],
-                          klineAdvancedLevel['id_tamp'])
+    def run_test(self, checkSurplus, stopLoss, principal, time=[]):
 
-    # main.runBackTest(klineMediumLevel, klineAdvancedLevel, medDF, advDF)
+        # 查询该表是否存在
+        if len(time) > 0:
+            table_name = '15m_60m_' + str(int(
+                float(checkSurplus) * 100)) + '_' + str(
+                    int(float(stopLoss) * 100)) + '_' + str(
+                        time[0]) + '_' + str(time[1])
+        else:
+            table_name = '15m_60m_' + str(int(
+                float(checkSurplus) * 100)) + '_' + str(
+                    int(float(stopLoss) * 100))
+        search_res = self.search_table(table_name)
 
-    # python 画图 已废弃
-    # drawMacd = DrawMacd(medDF.loc[0:10])
-    # drawMacd.run(medDF)
+        if search_res['status']:
+            # 表存在 更新record表内容 可以去list查看历史记录
+            # res = self.update_table_record(table_name)
+            print('已有同名表')
+        else:
+            # 首先按照时间区段解析行情数据
+            market_data_res = self._get_market_data(
+                ['2020_kline_15m', '2020_kline_1H'], time)
+            if market_data_res:
+                # 表不存在 创建表
+                create_res = self.sqlHandler.create_trade_marks_table(
+                    table_name)
+                if create_res['status']:
+                    # 创建表成功，执行回测
+                    self._run_investment(
+                        checkSurplus,
+                        stopLoss,
+                        principal,
+                        table_name,
+                        self.klineMediumLevel,
+                        self.klineAdvancedLevel,
+                        self.medDF,
+                        self.advDF,
+                    )
+
+    # 查询指定表，返回表头列表
+    def _get_table_column(self, table_name):
+        res = self.sqlHandler.select_table_colimn_name(table_name)
+        column_list = res['result']
+        column = []
+        # 编辑表头
+        for item in column_list:
+            if item[0] not in column:
+                column.append(item[0])
+        return column
+
+    def _run_investment(
+        self,
+        checkSurplus,
+        stopLoss,
+        principal,
+        table_name,
+        klineMediumLevel,
+        klineAdvancedLevel,
+        medDF,
+        advDF,
+    ):
+        # 遍历并插入数据
+        investment = Investment(checkSurplus, stopLoss, principal,
+                                klineMediumLevel, klineAdvancedLevel, medDF,
+                                advDF, table_name)
+        # 返回要写入table_record表的内容
+        investment.start()
+        # 更新record表内容 table_name
+        self.update_table_record(table_name)
+
+    def update_table_record(self, table_name):
+        # 更新record表内容 table_name
+        res = self.sqlHandler.insert_table_record_data(
+            str(round(time.time() * 1000)), table_name, True)
+        return res['status']
