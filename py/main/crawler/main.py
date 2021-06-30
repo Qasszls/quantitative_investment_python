@@ -2,27 +2,27 @@
 import emoji
 import threading
 import json
-import re
+import os
 import sys
 
-sys.path.append('..')
 from tqdm import tqdm
 
+sys.path.append('..')
+
 from util.TimeStamp import TimeTamp
+from util.OsHandler import OsHandler
 from MarketCrawler import MarketCrawler
 from MySqlHandler import MySqlHandler
-from util.OsHandler import OsHandler
 
 
 class Searchkline(threading.Thread):
-    def __init__(
-        self,
-        threadID,
-        marketCrawler,
-        mySqlHandler,
-        task=None,
-        timeTamp=None,
-    ):
+    def __init__(self,
+                 threadID,
+                 marketCrawler,
+                 mySqlHandler,
+                 task=None,
+                 timeTamp=None,
+                 symbol="BTC-USDT"):
         threading.Thread.__init__(self)
         self.task = task
         self.threadID = threadID
@@ -32,7 +32,8 @@ class Searchkline(threading.Thread):
 
         if not task:
             raise Exception('{}线程的任务不能为空'.format(threadID))
-        self.instId = task['symbol']
+        if symbol:
+            self.instId = symbol
         self.bar = int(task['bar'])
         self._bar_unit = task['_bar_unit']
         self.limit = str(task['limit'])
@@ -87,9 +88,9 @@ class Searchkline(threading.Thread):
                 return True, last_t_tamp, listLength, data
 
     def run(self):
-        database = self.task['database']
+        table = self.task['table']
         times = self.task['times']
-        # print(task, database)
+        # print(task, table)
         # 交易所 获取 相应k线
         # 2017-12-31 23:59:59 1514735999000
         # 2018-12-31 23:59:59 1546271999000
@@ -146,8 +147,7 @@ class Searchkline(threading.Thread):
                 break
             else:
                 # 操作数据库
-                status, msg = self.mySqlHandler.insert_kline_data(
-                    data, database)
+                status, msg = self.mySqlHandler.insert_kline_data(data, table)
                 if not status:
                     print(msg)
                     break
@@ -173,6 +173,8 @@ if __name__ == "__main__":
     config = json.load(f)
     task_library = config['task_library']
     task_filter = config['filter']
+    task_symbol = config['symbol']
+    task_DBName = config['DBName']
 
     # 实例化交易所
     marketCrawler = MarketCrawler(
@@ -186,7 +188,7 @@ if __name__ == "__main__":
         ip='127.0.0.1',
         userName='root',
         userPass='qass-utf-8',
-        DBName='BTC-USDT_kline',
+        DBName=task_DBName,
         charset='utf8',
     )
     #清屏
@@ -199,20 +201,19 @@ if __name__ == "__main__":
     task_target = []
     for item in task_library:
         for filter_item in task_filter:
-            if re.search(filter_item, item['database']):
+            if filter_item == item['table'].split('_')[2]:
                 task_target.append(item)
     # 遍历预期数据
     for i in range(len(task_target)):
         data = task_target[i]
         # 实例化线程对象
         search.append(
-            Searchkline(
-                data['database'],
-                marketCrawler,
-                mySqlHandler,
-                data,
-                timeTamp=timeTamp,
-            ))
+            Searchkline(data['table'],
+                        marketCrawler,
+                        mySqlHandler,
+                        data,
+                        timeTamp=timeTamp,
+                        symbol=task_symbol))
         search[len(search) - 1].start()
     for item in search:
         item.join()
