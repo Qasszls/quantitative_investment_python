@@ -62,7 +62,7 @@ from util.TimeStamp import TimeTamp
 
 
 class SimpleMacd():
-    def __init__(self, close_price, lowest_dif, medDF, advDF, mode, odds):
+    def __init__(self, mode, odds):
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -71,45 +71,29 @@ class SimpleMacd():
             'first_confirmation': None,
             'again_confirmation': None
         }
-        self.medDF = medDF.astype(float)
-        self.advDF = advDF
         self.step = 0
         self.mode = mode
         self.odds = odds
         self.timeTamp = TimeTamp()
 
-    def runStrategy(self, close_price, med_tamp, index, onCalculate,
-                    completed):
-        # 初始化变量
-        medDF_line = self.medDF.loc[index]  # 获取本级别的当日macd集合
-        adv_tamp_list = self.advDF['id_tamp'].values  # 获取高级别的时间戳
+    def runStrategy(self, kline_data, medDF_line, onCalculate, completed):
+        med_tamp = kline_data['id_tamp']
+        close_price = kline_data['close_price']
         # 计算中 钩子
-        onCalculate({'index': index})
+        onCalculate({
+            'close_price': close_price,
+            'id_tamp': med_tamp,
+        })
 
         # 核心算法，是否做多，本级别确认
-        mediumStatus = self.medium_read(close_price, medDF_line, med_tamp)
-        if mediumStatus:
-            # 实例化核心算法对象----高级别
-            # advMacdIndex = self._get_syn_timestamp(adv_tamp_list, med_tamp)
-            # advancedStatus = self.advance_read(self.advDF.loc[advMacdIndex])
-            completed({
-                'mediumStatus': mediumStatus,
-                'advancedStatus': True,
-                'close_price': close_price,
-                'tamp': med_tamp,
-                'index': index,
-                "step": self.step
-            })
-        else:
-            # 流程跑完 钩子
-            completed({
-                'mediumStatus': mediumStatus,
-                'advancedStatus': True,
-                'close_price': close_price,
-                'tamp': med_tamp,
-                'index': index,
-                "step": self.step
-            })
+        medium_status = self.medium_read(close_price, medDF_line, med_tamp)
+        # 实例化核心算法对象----高级别
+        completed({
+            'medium_status': medium_status,
+            'kline_data': kline_data,
+            'medDF_line': medDF_line,
+            "step": self.step
+        })
 
     # 获得同一时间的时间戳 时间戳同步
     # def _get_syn_timestamp(self, advTampList, medTamp):
