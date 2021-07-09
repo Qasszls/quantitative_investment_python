@@ -26,9 +26,7 @@ class WSserver:
     def run(self):
         serve = websockets.serve(self.handle, self.ip, self.port)
         print('please request ws://' + self.ip + ':' + self.port)
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(serve)
-        loop.run_forever()
+        asyncio.get_event_loop().run_until_complete(serve)
 
 
 if __name__ == "__main__":

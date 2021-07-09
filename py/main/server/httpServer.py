@@ -32,6 +32,7 @@ class Resquest(BaseHTTPRequestHandler):
             stopLoss = req_data['stop_loss']
             principal = req_data['cash']
             _name = req_data['name']
+            leverage = req_data['leverage']
             mode = 'strict'
             odds = 0.05
             req_date = []
@@ -40,7 +41,7 @@ class Resquest(BaseHTTPRequestHandler):
 
             self.wfile.write(json.dumps(result_search).encode())
             dataBackTesting.run_test(checkSurplus, stopLoss, principal, mode,
-                                     odds, _name, req_date)
+                                     odds, _name, req_date, leverage)
         if (re.search('/strategySet/list', self.path) != None):
             res_list = dataBackTesting.get_record_list('table_record')
             result_list['data'] = res_list
