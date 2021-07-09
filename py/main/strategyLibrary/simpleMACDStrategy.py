@@ -76,7 +76,7 @@ class SimpleMacd():
         self.odds = odds
         self.timeTamp = TimeTamp()
 
-    def runStrategy(self, kline_data, medDF_line, onCalculate, completed):
+    def runStrategy(self, kline_data, macd_data, onCalculate, completed):
         med_tamp = kline_data['id_tamp']
         close_price = kline_data['close_price']
         # 计算中 钩子
@@ -86,35 +86,14 @@ class SimpleMacd():
         })
 
         # 核心算法，是否做多，本级别确认
-        medium_status = self.medium_read(close_price, medDF_line, med_tamp)
+        medium_status = self.medium_read(close_price, macd_data, med_tamp)
         # 实例化核心算法对象----高级别
         completed({
             'medium_status': medium_status,
             'kline_data': kline_data,
-            'medDF_line': medDF_line,
+            'macd_data': macd_data,
             "step": self.step
         })
-
-    # 获得同一时间的时间戳 时间戳同步
-    # def _get_syn_timestamp(self, advTampList, medTamp):
-    #     index = 0
-    #     for item in advTampList:
-    #         diff = int(medTamp) - int(item)
-    #         # 兼容时间差为：
-    #         # if diff >= 0 and diff <= 86400000:
-    #         #     return index
-    #         if diff >= 0 and diff <= 3600000:
-    #             return index
-    #         index = index + 1
-
-    # # 高级别研判
-    # def advance_read(self, todayMacd):
-    #     # 在水上做多
-    #     if self._is_under_water(todayMacd['dif'], todayMacd['dea']):
-    #         return False
-    #     # 在水下的再研判 没有做
-    #     else:
-    #         return True
 
     # 本级别研判
     def medium_read(self, close_price, todayMacd, med_tamp):

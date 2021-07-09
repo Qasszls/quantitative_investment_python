@@ -7,7 +7,7 @@ import sys
 
 from tqdm import tqdm
 
-sys.path.append('..')
+sys.path.append("..")
 
 from util.TimeStamp import TimeTamp
 from util.OsHandler import OsHandler
@@ -167,9 +167,7 @@ if __name__ == "__main__":
     # 实例化命令行工具
     osHandler = OsHandler()
     # 取出任务队列 与 滤出队列
-    f = open(
-        '/Users/work/web/quantitative_investment_python/py/main/crawler/config.json',
-        'r')
+    f = open('../config.json', 'r')
     config = json.load(f)
     task_library = config['task_library']
     task_filter = config['filter']
@@ -177,12 +175,7 @@ if __name__ == "__main__":
     task_DBName = config['DBName']
 
     # 实例化交易所
-    marketCrawler = MarketCrawler(
-        access_key="7dbf6048-5661-4295-9298-d4e9da8b9609",
-        secret_key="FB9D1024634A61F8F5F2E376CE10512F",
-        passphrase="Zls2548120547",
-        host='https://www.okex.com',
-        simulated=True)
+    marketCrawler = MarketCrawler()
     # 实例化数据库对象
     mySqlHandler = MySqlHandler(
         ip='127.0.0.1',
