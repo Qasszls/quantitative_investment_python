@@ -66,23 +66,18 @@ class DataBackTesting:
 
     # 跑回测代码区块
     def _get_market_data(self, table_name, time=[]):
-        res1 = self.search_table(table_name[0], time)
-        res2 = self.search_table(table_name[1], time)
+        res1 = self.search_table(table_name, time)
 
-        if res1['status'] and res1['result'] and res2['status'] and res2[
-                'result']:
+        if res1['status'] and res1['result']:
             self.klineMediumLevel = self._get_kline_data(
-                res1['result'], table_name[0])
-            self.klineAdvancedLevel = self._get_kline_data(
-                res2['result'], table_name[1])
+                res1['result'], table_name)
+
             # 获取样本数据
             self.medDF = self._get_MACD(self.klineMediumLevel['close_price'],
                                         self.klineMediumLevel['id_tamp'])
-            self.advDF = self._get_MACD(self.klineAdvancedLevel['close_price'],
-                                        self.klineAdvancedLevel['id_tamp'])
             return True
         else:
-            print(res1['text'], res2['text'], '表不存在或为空')
+            print(res1, res2, '表不存在或为空')
             return False
 
     def _get_kline_data(self, data, table_name):
@@ -130,7 +125,8 @@ class DataBackTesting:
                  mode,
                  odds,
                  _name,
-                 time=[]):
+                 time=[],
+                 leverage=1):
 
         # 查询该表是否存在
         if len(time) > 0:
@@ -152,8 +148,7 @@ class DataBackTesting:
             print('已有同名表')
         else:
             # 首先按照时间区段解析行情数据
-            market_data_res = self._get_market_data(
-                ['2020_kline_1H', '2020_kline_1H'], time)
+            market_data_res = self._get_market_data('2020_kline_1H', time)
             if market_data_res:
                 # 表不存在 创建表
                 create_res = self.sqlHandler.create_trade_marks_table(
@@ -162,8 +157,8 @@ class DataBackTesting:
                     # 创建表成功，执行回测
                     self._run_investment(checkSurplus, stopLoss, principal,
                                          table_name, self.klineMediumLevel,
-                                         self.klineAdvancedLevel, self.medDF,
-                                         self.advDF, mode, odds, _name)
+                                         self.medDF, mode, odds, _name,
+                                         leverage)
 
     # 查询指定表，返回表头列表
     def _get_table_column(self, table_name):
@@ -177,12 +172,11 @@ class DataBackTesting:
         return column
 
     def _run_investment(self, checkSurplus, stopLoss, principal, table_name,
-                        klineMediumLevel, klineAdvancedLevel, medDF, advDF,
-                        mode, odds, _name):
+                        klineMediumLevel, medDF, mode, odds, _name, leverage):
         # 遍历并插入数据
         investment = Investment(checkSurplus, stopLoss, principal,
-                                klineMediumLevel, klineAdvancedLevel, medDF,
-                                advDF, table_name, mode, odds, _name)
+                                klineMediumLevel, medDF, table_name, mode,
+                                odds, _name, leverage)
         # 返回要写入table_record表的内容
         investment.start()
         # 更新record表内容 table_name
