@@ -11,16 +11,13 @@ from urllib.parse import urljoin
 
 class Request:
     """OKEX Spot REST API client."""
-    def __init__(self, trading_type='virtualPay'):
-        # 取出任务队列 与 滤出队列
-        f = open('../config.json', 'r')
-        config = json.load(f)
-        _pay = config[trading_type]
-        self._host = _pay['host']
-        self._access_key = _pay['access_key']
-        self._secret_key = _pay['secret_key']
-        self._passphrase = _pay['passphrase']
-        self.trading_type = trading_type
+    def __init__(self, user_info=None):
+        # user_info
+        self._host = user_info['host']
+        self._access_key = user_info['access_key']
+        self._secret_key = user_info['secret_key']
+        self._passphrase = user_info['passphrase']
+        self.trading_type = user_info['trading_type']
 
     # 工具函数
 
@@ -63,14 +60,13 @@ class Request:
 
             if not headers:
                 headers = {}
-            if self.trading_type == 'virtualPay':
+            if self.trading_type == '0':
                 headers["x-simulated-trading"] = '1'
             headers["Content-Type"] = "application/json"
             headers["OK-ACCESS-KEY"] = self._access_key
             headers["OK-ACCESS-SIGN"] = sign
             headers["OK-ACCESS-TIMESTAMP"] = str(timestamp)
             headers["OK-ACCESS-PASSPHRASE"] = self._passphrase
-
         result = requests.request(method,
                                   url,
                                   data=body,

@@ -88,8 +88,8 @@ class Investment(threading.Thread):
         simpleMacd = SimpleMacd(self.mode, self.odds)
         for index in range(len(self.medDF['macd']) - 1):
             simpleMacd.runStrategy(
-                self.klineMediumLevel.loc[index],
-                self.medDF.loc[index].astype(float),
+                self.klineMediumLevel.loc[index].to_dict(),
+                self.medDF.loc[index].astype(float).to_dict(),
                 self.onCalculate,
                 self.completed,
             )
@@ -160,7 +160,7 @@ class Investment(threading.Thread):
             isBuySet.append('0')
 
         #把用户与行情数据存入
-        _kline_list = kline_data.to_dict()
+        _kline_list = kline_data
 
         # 回测数据--数据打包
         _kline_list.update({
@@ -178,7 +178,7 @@ class Investment(threading.Thread):
         else:
             _kline_list['is_buy_set'] = 'wait'
         # 行情数据———macd 打包
-        _kline_list.update(macd_data.to_dict())
+        _kline_list.update(macd_data)
         # 自定义数据 -- 研判步骤 打包
         _kline_list['step'] = str(_step)
 

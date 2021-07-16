@@ -90,8 +90,11 @@ class SqlHandler:
     # 查询回测表数据
     def select_trade_marks_data(self, table, tamp=None):
         if tamp:
-            sql = "SELECT * FROM " + table + " WHERE id_tamp BETWEEN '" + tamp[
-                0] + "' AND '" + tamp[1] + "'"
+            if len(tamp) != 2:
+                sql = "SELECT * FROM " + table + " WHERE id_tamp < " + tamp
+            else:
+                sql = "SELECT * FROM " + table + " WHERE id_tamp BETWEEN '" + tamp[
+                    0] + "' AND '" + tamp[1] + "'"
         else:
             sql = "SELECT * FROM " + table
         return self._run_select(sql)
@@ -125,37 +128,6 @@ class SqlHandler:
 
         self._close(cursor, conn)
         return {'status': status, "text": text, "result": list(result)}
-
-    # 创建表
-    def create_trade_marks_table(self, table_name):
-        sql = "CREATE TABLE " + table_name + " (id_tamp VARCHAR (255) NOT NULL,open_price VARCHAR (255),high_price VARCHAR (255),lowest_price VARCHAR (255),close_price VARCHAR (255),vol VARCHAR (255),volCcy VARCHAR (255),check_surplus VARCHAR (255),stop_loss VARCHAR (255),principal VARCHAR (255),property VARCHAR (255),trading_price VARCHAR (255),buy_traces VARCHAR (255),date VARCHAR (255),is_buy_set VARCHAR (255),macd VARCHAR (255),dif VARCHAR (255),dea VARCHAR (255),bar VARCHAR (255),step VARCHAR (255),PRIMARY KEY (id_tamp))"
-        influence = 0
-        text = ''
-        status = ''
-        result = ''
-        cursor, conn = self._conn()
-        try:
-            # 执行sql语句
-            influence = cursor.execute(sql)
-            # 提交到数据库执行
-            conn.commit()
-            text = '已创建: ' + str(influence) + ' 表。'
-            status = True
-        except Exception as e:
-            # 如果发生错误则回滚
-            conn.rollback()
-            text = str(e) + str(influence) + 'create_trade_marks_table'
-            status = False
-            print(text)
-
-        self._close(cursor, conn)
-        return {'status': status, "text": text, "result": result}
-
-    # 插入 总表 数据
-    def insert_table_record_data(self, table_id, table_name, table_status):
-        sql = "INSERT INTO table_record (id, table_name, table_status) VALUES ('%s', '%s', '%s')" % (
-            table_id, table_name, table_status)
-        return self._insert_run(sql, table_id + table_name)
 
     # 插入 行情数据 数据
     def insert_trade_marks_data(self, data, table_name):
@@ -191,6 +163,35 @@ class SqlHandler:
             conn.rollback()
             text = str(e) + str(influence) + 'insert' + name
             status = False
-            print(sql,'\n',text)
+            print(sql, '\n', text)
+        self._close(cursor, conn)
+        return {'status': status, "text": text, "result": result}
+
+    #更新数据
+    def update_buy_set(self, table_name, data):
+        sql = "UPDATE {0} SET is_buy_set = '{1}' where id_tamp = {2}".format(
+            table_name, data['is_buy_set'], data['date_key'])
+        return self._update_run(sql, 'update')
+
+    #更新数据操作 执行事务
+    def _update_run(self, sql, name):
+        influence = 0
+        text = ''
+        status = ''
+        result = ''
+        cursor, conn = self._conn()
+        try:
+            # 执行sql语句
+            influence = cursor.execute(sql)
+            # 提交到数据库执行
+            conn.commit()
+            text = '数据更新: ' + str(influence) + ' 条。' + name
+            status = True
+        except Exception as e:
+            # 如果发生错误则回滚
+            conn.rollback()
+            text = str(e) + str(influence) + 'update' + name
+            status = False
+            print(sql, '\n', text)
         self._close(cursor, conn)
         return {'status': status, "text": text, "result": result}

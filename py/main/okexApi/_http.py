@@ -12,8 +12,8 @@ from util.request import Request
 
 
 class HttpApi:
-    def __init__(self, trading_type='virtualPay'):
-        self.req = Request(trading_type)
+    def __init__(self, user_info=None):
+        self.req = Request(user_info)
 
     # 再次封装
     def request(self, path, params=None, body=None, methods='GET', auth=False):
@@ -23,14 +23,14 @@ class HttpApi:
                                          body=body,
                                          auth=auth)
         if result:
-            return result['data'][0]
+            return result['data'][0], error
         else:
             print('接口', path, '请求错误', error)
+            return result, error
 
     # 获取okex服务器时间
-    async def get_public_time(self):
-        return await json.loads(self.request('/api/v5/public/time')
-                                )['data'][0]['ts']
+    def get_public_time(self):
+        return self.request('/api/v5/public/time')
 
     # 获取okex @params 最大可买卖/开仓数量  （最多可以买/卖多少个币）买进来
     def get_account_max_size(self, params):
@@ -55,6 +55,10 @@ class HttpApi:
                             methods="POST",
                             auth=True)
 
+    # 订单详情
+    def search_order(self, params):
+        return self.request('/api/v5/trade/order', params=params, auth=True)
+
     # 市价仓位全平
     def close_position(self, params):
         return self.request('/api/v5/trade/close-position',
@@ -72,7 +76,11 @@ class HttpApi:
 
     # 获取当个产品行情信息
     def market_ticker(self, params):
-        return self.request('/api/v5/market/ticker', params=params, auth=True)
+        return self.request('/api/v5/market/ticker', params=params)
+
+    # 获取指数k线行情
+    def _get_kline_data(self, params):
+        return self.request('/api/v5/market/index-candles', params=params)
 
     # # 获取杠杆倍数
     # def get_account_leverage_info(self, params):

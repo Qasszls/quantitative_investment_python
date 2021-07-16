@@ -1,5 +1,6 @@
 # -*- coding:UTF-8 -*-
 
+from numpy.lib.npyio import loads
 import pandas as pd
 import numpy as np
 import emoji
@@ -8,6 +9,8 @@ import threading
 import time
 import asyncio
 import re
+import json
+from pymysql import NULL
 from requests.api import request
 
 from tqdm import tqdm
@@ -20,17 +23,35 @@ from util.TimeStamp import TimeTamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from okexApi._socket import SocketApi
 from okexApi._http import HttpApi
-# from sqlHandler import SqlHandler
+from sqlHandler import SqlHandler
 
 
 class Trading:
-    def __init__(self, checkSurplus, stopLoss, mode=None, odds=0.03, lever=3):
+    def __init__(self,
+                 checkSurplus,
+                 stopLoss,
+                 mode=None,
+                 odds=0.03,
+                 lever=3,
+                 user_info=None):
+        if not user_info:
+            print('请填写用户信息')
+            return
+
+        self.table_name = user_info['table_name']
+
         self.simpleMacd = SimpleMacd(mode, odds)
         self.socket = SocketApi(callback=self._router,
-                                trading_type="virtualPay")  # 初始化长连接
-        self.http = HttpApi(trading_type="virtualPay")  # 初始化长连接
+                                user_info=user_info)  # 初始化长连接
+        self.http = HttpApi(user_info=user_info)  # 初始化短连接
         self.timeTamp = TimeTamp()
-
+        self.sqlHandler = SqlHandler(
+            ip='127.0.0.1',
+            userName='root',
+            userPass='qass-utf-8',
+            DBName='BTC-USDT_kline',
+            charset='utf8',
+        )
         self.checkSurplus = checkSurplus  # 玩家止盈率
         self.stopLoss = stopLoss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
@@ -40,17 +61,19 @@ class Trading:
         self._c = 0  # 现金余额 - 默认为USDT
 
         # 内部变量
-        self.ema12 = 0
-        self.ema26 = 0
-        self.dea = 0
+        self.buy_times = 0
+
+        self.ema12 = 31940.0
+        self.ema26 = 31936.7
+        self.dea = 10.7
         self.old_kl = []
         # 对照字典表
         self.channel_Dict = {
-            'balance_and_position':
-            self.update_position,  # 走update_position函数、
-            'positions': self.update_position,
-            "candle": self.breathing,  # 走 breathing 函数
-            'account': self.update_user  #走 update_user 函数
+            'balance_and_position': self.update_position,  # 走 更新持仓信息 函数、
+            'positions': self.update_position,  # 走 同上的函数
+            "candle": self.breathing,  # 走 行情检测 函数
+            'account': self.update_user,  #走 更新用户信息 函数
+            'restart': self.restart
         }
 
         self.btc_shangzuoliu_001 = {
@@ -69,7 +92,6 @@ class Trading:
         }
 
     def query(self, channel):
-
         if channel in self.channel_Dict:
             return self.channel_Dict[channel]
         elif re.search('candle', channel).group():
@@ -78,33 +100,32 @@ class Trading:
             print('调用错误')
             return False
 
+    # 推送路由
+    def _router(self, res):
+        # 自定义回调数据
+        if 'type' in res:
+            _fun = self.query(res['type'])
+            _fun(res['data'])
+        # else:
+        #     # okex 回调数据
+        #     channel = res['arg']['channel']
+        #     data = res['data'][0]
+        #     _fun = self.query(channel)
+        #     _fun(data)
+
     # 主函数
     def _init(self):
         self._set_lever()
-        new_loop = asyncio.new_event_loop()  #在当前线程下创建时间循环，（未启用）
-        t = threading.Thread(target=self.start_loop,
-                             args=(new_loop, ))  #通过当前线程开启新的线程去启动事件循环
-        t.start()
-        # 启动私有socket接口轮询的事件循环
-        for subscribe in [
-                'positions',
-                'market',
-                # 'account'
-        ]:
-            asyncio.run_coroutine_threadsafe(self.socket.run(subscribe),
-                                             new_loop)
 
-    # 运行事件循环
-    def start_loop(self, loop):
-        asyncio.set_event_loop(loop)
-        loop.run_forever()
+        #配置私有公有链接的频道
 
-    # 推送路由
-    def _router(self, res):
-        channel = res['arg']['channel']
-        data = res['data'][0]
-        _fun = self.query(channel)
-        _fun(data)
+        # 启动主函数 public_subscribe=['market']  //// , 'account'positions
+        self.socket.run(private_subscribe=['account'],
+                        public_subscribe=['market'])
+
+        # while True:
+        #     time.sleep(2)
+        #     print('子线程', threading.enumerate())
 
     # 更新持仓数据
     def update_position(self, data):
@@ -119,7 +140,7 @@ class Trading:
 
         # 检测止盈止损
         if _is_checkSurplus() or _is_sotpLoss():
-            self.allSell(1)
+            asyncio.run_coroutine_threadsafe(self.allSell(), self.new_loop)
 
     # 更新用户数据
     def update_user(self, data):
@@ -135,7 +156,243 @@ class Trading:
 
         self._c = _get_usdt(_detail)  # 更新用户的USDT的币种余额
 
-    # 工具查询---buy/sell阶段-数量
+    # 重启策略
+    def restart(self, data):
+        _wname = data['_wname']
+        # 是服务器的原因 还是 网络的原因
+        # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
+        # 否则如果是私有频道，直接恢复
+        if _wname == 'private':
+            self.socket.run(private_subscribe=['account', 'positions'])
+        else:
+            # 不然就执行谨慎的恢复方法
+            # 谨慎的恢复方法为
+            # 材料： 链接中断时的时间戳
+            # 准备1： 根据【链接中断时的时间戳】推断出 链接中断的时间节点
+            # 准备2： 传送【链接中断的时间节点】给服务器，获取目前时间到 该时间节点的所有k线数据
+            # 准备3： 根据k线数据计算每一节点的【量化数据（list）】
+            # 阶段： 在谨慎的恢复方法执行之前
+            # 1.判断主线程与当前服务器时间间隔N（秒），N小于等于30秒的，仍认为当前数据连接中断状态
+            # 2.使用time.sleep方法模拟中断时间，入参为N。
+            # 阶段： 在谨慎的恢复方法执行之中
+            # 1.N秒后遍历【量化数据（list）】并调用breathing方法进行计算与数据落库的工作（争议：在此期间买点、卖点被激活怎么办？）
+            # 2.调用 socket.run 方法重启被中断的链接
+            self.socket.run(private_subscribe=['market'])
+
+    # 策略核心内容
+    def breathing(self, kline_data):
+        # 判断新老数据
+        # 第一次进入循环 或者 同一时间的老数据，都会进入
+        if kline_data[0] in self.old_kl:
+            # 其实可以完全不写下面的代码，但是意义就不一样了。
+            self.old_kl = kline_data
+            return
+        else:
+            # 防止数据为初始化就走下面的逻辑
+            if len(self.old_kl) == 0:
+                self.old_kl = kline_data
+                return
+
+            _k = pd.DataFrame([self.old_kl]).astype(float)
+            _k.columns = [
+                'id_tamp', 'open_price', 'high_price', 'lowest_price',
+                'close_price', 'vol', 'volCcy'
+            ]
+
+            KLINE_DATA = _k.to_dict('records')[0]
+            # 准备数据-macd
+            MACD_DATA = self._befor_investment(KLINE_DATA)
+            # 运行策略 *********** door **************
+            self.simpleMacd.runStrategy(
+                KLINE_DATA,
+                MACD_DATA,
+                self.onCalculate,
+                self.completed,
+            )
+            self.old_kl = kline_data
+
+    #钩子函数 计算中
+    def onCalculate(self, res):
+        # 变量定义
+        None
+
+    #钩子函数 计算完成
+    def completed(self, res):
+        medium_status = res['medium_status']  # 初级判断状态
+        kline_data = res['kline_data']  # k线数据包
+        macd_data = res['macd_data']  # macd数据包
+        _step = res['step']  # 策略执行步骤
+        id_tamp = kline_data['id_tamp']  # 时间戳
+
+        if medium_status and self.buy_times <= 4:
+            #买入 钩子
+            asyncio.run_coroutine_threadsafe(self.allBuy(id_tamp),
+                                             self.new_loop)
+
+        # 数据装车
+        # 把用户与行情数据存入
+        _kline_list = kline_data
+        # 回测数据--数据打包
+        _kline_list.update({
+            'date': self.timeTamp.get_time_normal(id_tamp),
+            'is_buy_set': 'wait'
+        })
+
+        # 行情数据———macd 打包
+        _kline_list.update({
+            'dif': macd_data['dif'],
+            "dea": macd_data['dea'],
+            "macd": macd_data['macd'],
+            "bar": macd_data['bar'] * 2
+        })
+        # 自定义数据 -- 研判步骤 打包
+        _kline_list['step'] = str(_step)
+        # 装车
+        res = self.sqlHandler.insert_trade_marks_data(_kline_list,
+                                                      self.table_name)
+
+    # 下单
+    async def allBuy(self):
+        result = self._get_trad_sz()
+        action = 'buy'
+        availBuy = result['availBuy']  # 当前币对最大可用的数量
+        # 获取变量
+        instId = self.btc_shangzuoliu_001['instId']
+        tdMode = self.btc_shangzuoliu_001['tdMode']
+        ordType = self.btc_shangzuoliu_001['ordType']
+        ccy = self.btc_shangzuoliu_001['ccy']
+
+        # 配置策略内容
+        params = {
+            'instId': instId,
+            'tdMode': tdMode,
+            'side': action,
+            'ordType': ordType,
+            'sz': availBuy * 0.7,
+            'ccy': ccy,
+        }
+        # 下订单-市价买入
+        res, error = self.http.trade_order(params)
+
+        if error:
+            print('buy error')
+            return
+        else:
+            print('buy')
+            self._trading_record(ordId=res['ordId'], is_buy_set='1')
+
+    async def allSell(self):
+        action = 'sell'
+        availSell = self._get_trad_sz()['availSell']
+
+        # 获取变量
+        instId = self.btc_shangzuoliu_001['instId']
+        mgnMode = self.btc_shangzuoliu_001['mgnMode']
+        ccy = self.btc_shangzuoliu_001['ccy']
+
+        # 配置策略内容
+        params = {
+            'instId': instId,
+            'mgnMode': mgnMode,
+            'ccy': ccy,
+        }
+        # 下订单-市价平仓
+        res, error = self.http.close_position(params)
+        if error:
+            print('sell error')
+            self._trading_record(ordId=None, is_buy_set='0')
+            return
+        else:
+            print('sell')
+            self._trading_record(ordId=None, is_buy_set='0')
+
+    # 记录交易点
+    def _trading_record(self, ordId, is_buy_set):
+        params = (self.table_name, {
+            'is_buy_set': is_buy_set,
+            'date_key': None
+        })
+        _now_tamp = None
+        # 有订单ID，正常下单
+        if ordId:
+            instId = self.btc_shangzuoliu_001['instId']
+            res, error = self.http.search_order({
+                'instId': instId,
+                'ordId': ordId
+            })
+            if res:
+                if self.buy_times > 1:
+                    _now_tamp = res['cTime']
+                else:
+                    _now_tamp = res['uTime']
+        # 没有订单ID，市价全平
+        else:
+            res, error = self.http.get_public_time()
+            _now_tamp = res['ts']
+
+        _sr = self.sqlHandler.select_trade_marks_data(self.table_name,
+                                                      _now_tamp)
+
+        # 取出list中最后一个元素，作为交易的时间。
+        _tamp = _sr['result'][len(_sr['result']) - 1][0]
+        params['date_key'] = _tamp
+
+        _ur = self.sqlHandler.update_buy_set(params)
+
+        if _ur['status']:
+            if is_buy_set == '1':
+                self.buy_times = self.buy_times + 1
+            else:
+                self.buy_times = 0
+            print('写入结束')
+            print('写入交易点成功，code=', is_buy_set, '。交易时间为：',
+                  self.timeTamp.get_time_normal(_tamp), '交易价格为:', res['avgPx'])
+        else:
+            print('写入交易点失败code=', is_buy_set)
+
+    def _befor_investment(self, kline_data):
+        # 私有函数
+        # 计算macd值
+        def _count_macd(price):
+            """
+            基准
+            12
+            26
+            """
+            # 获取往日 数据
+            last_ema12 = self.ema12
+            last_ema26 = self.ema26
+            last_dea = self.dea
+            # 计算当日 数据
+
+            EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
+            EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
+            DIF = EMA12 - EMA26
+            DEA = last_dea * 8 / 10 + DIF * 2 / 10
+            MACD = DIF - DEA
+            return {
+                'ema12': EMA12,
+                'ema26': EMA26,
+                'dif': DIF,
+                "dea": DEA,
+                "macd": MACD * 2,
+                "bar": MACD * 2
+            }
+
+        # 计算macd
+
+        MACD_DATA = _count_macd(kline_data['close_price'])
+        # 赋值当日macd变量
+        self.ema12 = MACD_DATA['ema12']
+        self.ema26 = MACD_DATA['ema26']
+        self.dif = MACD_DATA['dif']
+        self.dea = MACD_DATA['dea']
+        self.macd = MACD_DATA['macd']
+        return MACD_DATA
+
+
+# 工具查询---buy/sell阶段-数量
+
     def _set_lever(self):
         #设置杠杆倍数 交易前配置
         instId = self.btc_shangzuoliu_001['instId']
@@ -157,12 +414,12 @@ class Trading:
         if tdMode == 'cross':
             _max_size_params['ccy'] = ccy
         # 获得野生可购买数量 - 烹饪食材
-        _m_a_s_data = self.http.get_account_max_avail_size(_max_size_params)
+        _m_a_s_data, error = self.http.get_account_max_avail_size(
+            _max_size_params)
         _m_s_availBuy = float(_m_a_s_data['availBuy'])  # 获得最大买入数量 ***
         _m_s_availSell = float(_m_a_s_data['availSell'])  # 获得最大卖出数量 ***
-
         # 获取交易产品基础信息 - 烹饪调料
-        _p_i_result = self.http.get_public_instruments({
+        _p_i_result, error = self.http.get_public_instruments({
             'instType': instType,
             'instId': instId
         })
@@ -183,123 +440,20 @@ class Trading:
     def _get_market_ticker(self):
         instId = self.btc_shangzuoliu_001['instId']
         params = {'instId': instId}
-        result = self.http.market_ticker(params)
+        result, error = self.http.market_ticker(params)
         askPx = result['askPx']
         return {'askPx': askPx}
 
-    # 策略核心内容
-    def breathing(self, kline_data):
-        #判断新老数据
-        if kline_data[0] in self.old_kl:
-            return
-        # 准备数据-kline
-        self.old_kl = kline_data
-        kline_data = pd.DataFrame([kline_data]).astype(float)
-        kline_data.columns = [
-            'id_tamp', 'open_price', 'high_price', 'lowest_price',
-            'close_price', 'vol', 'volCcy'
-        ]
-        KLINE_DATA = kline_data.to_dict('records')[0]
-        # 准备数据-macd
-        MACD_DATA = self._befor_investment(KLINE_DATA)
-
-        # 运行策略 *********** door **************
-        self.simpleMacd.runStrategy(
-            KLINE_DATA,
-            MACD_DATA,
-            self.onCalculate,
-            self.completed,
-        )
-
-    #钩子函数 计算中
-    def onCalculate(self, res):
-        # 变量定义
-        None
-
-    #钩子函数 计算完成
-    def completed(self, res):
-        medium_status = res['medium_status']  # 初级判断状态
-        kline_data = res['kline_data']  # k线数据包
-
-        close_price = kline_data['close_price']  # 收盘价
-        id_tamp = kline_data['id_tamp']  # 时间戳
-        if medium_status and self.principal >= close_price:
-            #买入 钩子
-            self.allBuy(id_tamp)
-
-        # 数据装车
-
-    # 下单
-    def allBuy(self, id_tamp):
-        result = self._get_trad_sz()
-        action = 'buy'
-        availBuy = result['availBuy']  # 当前币对最大可用的数量
-        # 获取变量
-        instId = self.btc_shangzuoliu_001['instId']
-        tdMode = self.btc_shangzuoliu_001['tdMode']
-        ordType = self.btc_shangzuoliu_001['ordType']
-        ccy = self.btc_shangzuoliu_001['ccy']
-
-        # 配置策略内容
-        params = {
-            'instId': instId,
-            'tdMode': tdMode,
-            'side': action,
-            'ordType': ordType,
-            'sz': availBuy * 0.7,
-            'ccy': ccy,
-        }
-        # 下订单-市价买入
-        self.http.trade_order(params)
-
-    def allSell(self, id_tamp):
-        ccy = self.btc_shangzuoliu_001['ccy']
-        instId = self.btc_shangzuoliu_001['instId']
-        mgnMode = self.btc_shangzuoliu_001['mgnMode']
-
-        _p = {'instId': instId, 'mgnMode': mgnMode, 'ccy': ccy}
-
-        result, error = self.http.close_position(_p)
-        print('卖出！')
-
-    def _befor_investment(self, kline_data):
-        # 计算macd
-        MACD_DATA = self._count_macd(kline_data['close_price'])
-        # 赋值当日macd变量
-        self.ema12 = MACD_DATA['ema12']
-        self.ema26 = MACD_DATA['ema26']
-        self.dif = MACD_DATA['dif']
-        self.dea = MACD_DATA['dea']
-        self.macd = MACD_DATA['macd']
-        return MACD_DATA
-
-    def _count_macd(self, price):
-        """
-        基准
-        12
-        26
-        """
-        # 获取往日 数据
-        last_ema12 = self.ema12
-        last_ema26 = self.ema26
-        last_dea = self.dea
-        # 计算当日 数据
-        EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
-        EMA26 = last_ema26 * 11 / 27 + price * 2 / 27
-        DIF = EMA12 - EMA26
-        DEA = last_dea * 8 / 10 + DIF * 2 / 10
-        MACD = DIF - DEA
-
-        return {
-            'ema12': EMA12,
-            'ema26': EMA26,
-            'dif': DIF,
-            "dea": DEA,
-            "macd": MACD,
-            "bar": MACD * 2
-        }
-
-
 if __name__ == "__main__":
-    trading = Trading(0.16, 0.075)
-    trading._init()
+    # 获取要执行的用户配置
+
+    # macd 底背离
+    f = open('../config.json', 'r')
+    _data = json.load(f)
+    # trading = Trading(0.16, 0.075, user_info=_data['realPay'])
+    # trading._init()
+    _ulist = _data['realPay']['children']
+    for item in _ulist:
+        if item['name'] == 'qassChildrenTwo':
+            trading = Trading(0.05, 0.025, user_info=item)
+            trading._init()

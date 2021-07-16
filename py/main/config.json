@@ -115,27 +115,55 @@
     ],
     "filter":["1D"],
     "DBName":"BTC-USDT_kline",
-    "PLATFORMS": {
-        "okex": {
-          "access_key": "7dbf6048-5661-4295-9298-d4e9da8b9609",
-          "secret_key": "FB9D1024634A61F8F5F2E376CE10512F"
-        }
-    },
     "DINGTALK": "",
     "strategy_name": "double_ma_strategy",
     "platform": "OKEX",
     "symbol": "BTC-USDT",
-     "kline_interval": "5m",
+    "kline_interval": "5m",
     "realPay":{
         "host":"https://www.okex.com",
         "access_key" :"1b8a5361-5ca4-46f9-bc44-e8ca92f5b5be",
         "secret_key" :"B993AADED4E2FAB374DED76C7BF1509B",
-        "passphrase" :"ZLS2548120547"
+        "passphrase" :"ZLS2548120547",
+        "table_name":"realPay_1m",
+        "trading_type":"1",  
+        "market_lv":"candle1m",
+
+        "children":[
+          {
+            "host":"https://www.okex.com",
+            "access_key" :"2d37666a-63e3-44c9-b0bf-29d212d0ef67",
+            "secret_key" :"B2C89234F7CDF55EFFA80C400B8E2326",
+            "passphrase" :"Zls2548120547",
+            "table_name":"realPay_qassChildrenOne_1m",
+            "name":"qassChildrenOne",
+            "note":"子账户，用来交易MACD底背离交易策略",
+            "trading_type":"1",
+            "market_lv":"candle1m"
+          },
+          {
+            "host":"https://www.okex.com",
+            "access_key" :"cba5d8fc-d233-498c-b18b-5c4f1942eb90",
+            "secret_key" :"7DF96F09287EF80869E85C964935E14A",
+            "passphrase" :"Zls2548120547",
+            "table_name":"realPay_qassChildrenTwo_1m",
+            "name":"qassChildrenTwo",
+            "note":"子账户，用来交易MACD底背离交易策略",
+            "trading_type":"1",
+            "market_lv":"candle1m"
+
+          }
+        ]
     },
     "virtualPay":{
         "host":"https://www.okex.com",
         "access_key" :"7dbf6048-5661-4295-9298-d4e9da8b9609",
         "secret_key" :"FB9D1024634A61F8F5F2E376CE10512F",
-        "passphrase" :"Zls2548120547"
+        "passphrase" :"Zls2548120547",
+        "table_name":"virtualPay_1m",
+        "trading_type":"0",
+        "market_lv":"candle1m"
+
+
     }
 }
