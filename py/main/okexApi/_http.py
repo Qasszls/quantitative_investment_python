@@ -17,20 +17,28 @@ class HttpApi:
 
     # 再次封装
     def request(self, path, params=None, body=None, methods='GET', auth=False):
-        result, error = self.req.request(methods,
-                                         path,
-                                         params,
-                                         body=body,
-                                         auth=auth)
+        try:
+            result, error = self.req.request(methods,
+                                             path,
+                                             params,
+                                             body=body,
+                                             auth=auth)
+        except:
+            result = None
+            error = '网络出错'
         if result:
-            return result['data'][0], error
+            return result['data'], error
         else:
-            print('接口', path, '请求错误', error)
+            print('接口', path, error)
             return result, error
 
     # 获取okex服务器时间
     def get_public_time(self):
         return self.request('/api/v5/public/time')
+
+    # 获取服务器更新时间
+    def get_update_status(self):
+        return self.request('/api/v5/system/status')
 
     # 获取okex @params 最大可买卖/开仓数量  （最多可以买/卖多少个币）买进来
     def get_account_max_size(self, params):

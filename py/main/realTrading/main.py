@@ -62,10 +62,14 @@ class Trading:
 
         # 内部变量
         self.buy_times = 0
-
-        self.ema12 = 31940.0
-        self.ema26 = 31936.7
-        self.dea = 10.7
+        # 1m
+        # self.ema12 = 29656.0
+        # self.ema26 = 29671.5
+        # self.dea = -15.1924
+        # 15m
+        self.ema12 = 31496.9
+        self.ema26 = 31285.7
+        self.dea = 234.1
         self.old_kl = []
         # 对照字典表
         self.channel_Dict = {
@@ -89,6 +93,10 @@ class Trading:
             'slTriggerRate': self.stopLoss,  # 止损
             'ordType':
             'market',  # 倾向策略方式 conditional：单向止盈止损、oco：双向止盈止损、trigger：计划委托
+            'subscribe': {
+                '_private': ['account', 'positions'],
+                '_public': ['market']
+            },  # 监听的频道列表
         }
 
     def query(self, channel):
@@ -106,26 +114,25 @@ class Trading:
         if 'type' in res:
             _fun = self.query(res['type'])
             _fun(res['data'])
-        # else:
-        #     # okex 回调数据
-        #     channel = res['arg']['channel']
-        #     data = res['data'][0]
-        #     _fun = self.query(channel)
-        #     _fun(data)
+        else:
+            # okex 回调数据
+            channel = res['arg']['channel']
+            data = res['data'][0]
+            _fun = self.query(channel)
+            _fun(data)
 
     # 主函数
     def _init(self):
         self._set_lever()
-
         #配置私有公有链接的频道
-
-        # 启动主函数 public_subscribe=['market']  //// , 'account'positions
-        self.socket.run(private_subscribe=['account'],
-                        public_subscribe=['market'])
+        _pri = self.btc_shangzuoliu_001['subscribe']['_private']
+        _pub = self.btc_shangzuoliu_001['subscribe']['_public']
+        self.socket.run(public_subscribe=_pub)
+        self.socket.run(private_subscribe=_pri)
 
         # while True:
         #     time.sleep(2)
-        #     print('子线程', threading.enumerate())
+        #     print('\n 子线程', threading.enumerate())
 
     # 更新持仓数据
     def update_position(self, data):
@@ -140,7 +147,7 @@ class Trading:
 
         # 检测止盈止损
         if _is_checkSurplus() or _is_sotpLoss():
-            asyncio.run_coroutine_threadsafe(self.allSell(), self.new_loop)
+            self.allSell()
 
     # 更新用户数据
     def update_user(self, data):
@@ -157,27 +164,47 @@ class Trading:
         self._c = _get_usdt(_detail)  # 更新用户的USDT的币种余额
 
     # 重启策略
-    def restart(self, data):
-        _wname = data['_wname']
+    def restart(self, _wname):
+        print('星球重启---相机开启新的连接')
+        _ures, error = self.http.get_update_status()
+        if not error and len(_ures) > 0 and _ures['state'] == 'ongoing':
+            _udate_start = _ures['start']  # 服务器更新完成时间
+            _udate_end = _ures['end']  # 服务器更新完成时间
+
+            print(_ures, '服务器返回数据', '更新开始时间: ',
+                  self.timeTamp.get_time_normal(_udate_start), '更新结束时间: ',
+                  self.timeTamp.get_time_normal(_udate_end))
+            # 服务器正在更新
+            print(_ures, '更新中，谨慎恢复')
+        elif error:
+            # 网络问题 轮询请求接口，等待网络恢复
+            print(error)
+            time.sleep(2)
+            self.restart(_wname)
+        else:
+            print('重启星球')
+            _pri = self.btc_shangzuoliu_001['subscribe']['_private']
+            _pub = self.btc_shangzuoliu_001['subscribe']['_public']
+            if _wname == 'private':
+                self.socket.run(private_subscribe=_pri)
+            else:
+                self.socket.run(public_subscribe=_pub)
+
         # 是服务器的原因 还是 网络的原因
         # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
         # 否则如果是私有频道，直接恢复
-        if _wname == 'private':
-            self.socket.run(private_subscribe=['account', 'positions'])
-        else:
-            # 不然就执行谨慎的恢复方法
-            # 谨慎的恢复方法为
-            # 材料： 链接中断时的时间戳
-            # 准备1： 根据【链接中断时的时间戳】推断出 链接中断的时间节点
-            # 准备2： 传送【链接中断的时间节点】给服务器，获取目前时间到 该时间节点的所有k线数据
-            # 准备3： 根据k线数据计算每一节点的【量化数据（list）】
-            # 阶段： 在谨慎的恢复方法执行之前
-            # 1.判断主线程与当前服务器时间间隔N（秒），N小于等于30秒的，仍认为当前数据连接中断状态
-            # 2.使用time.sleep方法模拟中断时间，入参为N。
-            # 阶段： 在谨慎的恢复方法执行之中
-            # 1.N秒后遍历【量化数据（list）】并调用breathing方法进行计算与数据落库的工作（争议：在此期间买点、卖点被激活怎么办？）
-            # 2.调用 socket.run 方法重启被中断的链接
-            self.socket.run(private_subscribe=['market'])
+        # 不然就执行谨慎的恢复方法
+        # 谨慎的恢复方法为
+        # 材料： 链接中断时的时间戳
+        # 准备1： 根据【链接中断时的时间戳】推断出 链接中断的时间节点
+        # 准备2： 传送【链接中断的时间节点】给服务器，获取目前时间到 该时间节点的所有k线数据
+        # 准备3： 根据k线数据计算每一节点的【量化数据（list）】
+        # 阶段： 在谨慎的恢复方法执行之前
+        # 1.判断主线程与当前服务器时间间隔N（秒），N小于等于30秒的，仍认为当前数据连接中断状态
+        # 2.使用time.sleep方法模拟中断时间，入参为N。
+        # 阶段： 在谨慎的恢复方法执行之中
+        # 1.N秒后遍历【量化数据（list）】并调用breathing方法进行计算与数据落库的工作（争议：在此期间买点、卖点被激活怎么办？）
+        # 2.调用 socket.run 方法重启被中断的链接
 
     # 策略核心内容
     def breathing(self, kline_data):
@@ -224,10 +251,9 @@ class Trading:
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
 
-        if medium_status and self.buy_times <= 4:
+        if medium_status and self.buy_times <= 3:
             #买入 钩子
-            asyncio.run_coroutine_threadsafe(self.allBuy(id_tamp),
-                                             self.new_loop)
+            self.allBuy()
 
         # 数据装车
         # 把用户与行情数据存入
@@ -250,9 +276,10 @@ class Trading:
         # 装车
         res = self.sqlHandler.insert_trade_marks_data(_kline_list,
                                                       self.table_name)
+        print('完成节点:', self.timeTamp.get_time_normal(id_tamp))
 
     # 下单
-    async def allBuy(self):
+    def allBuy(self):
         result = self._get_trad_sz()
         action = 'buy'
         availBuy = result['availBuy']  # 当前币对最大可用的数量
@@ -268,7 +295,7 @@ class Trading:
             'tdMode': tdMode,
             'side': action,
             'ordType': ordType,
-            'sz': availBuy * 0.7,
+            'sz': availBuy * 2,
             'ccy': ccy,
         }
         # 下订单-市价买入
@@ -278,12 +305,12 @@ class Trading:
             print('buy error')
             return
         else:
-            print('buy')
-            self._trading_record(ordId=res['ordId'], is_buy_set='1')
+            if len(res) == 0:
+                print('买单无数据')
+                return
+            self._trading_record(ordId=res[0]['ordId'], is_buy_set='1')
 
-    async def allSell(self):
-        action = 'sell'
-        availSell = self._get_trad_sz()['availSell']
+    def allSell(self):
 
         # 获取变量
         instId = self.btc_shangzuoliu_001['instId']
@@ -321,34 +348,40 @@ class Trading:
                 'ordId': ordId
             })
             if res:
+                _data = res[0]
                 if self.buy_times > 1:
-                    _now_tamp = res['cTime']
+                    _now_tamp = _data['cTime']
                 else:
-                    _now_tamp = res['uTime']
+                    _now_tamp = _data['uTime']
         # 没有订单ID，市价全平
         else:
             res, error = self.http.get_public_time()
-            _now_tamp = res['ts']
+            _now_tamp = res[0]['ts']
 
-        _sr = self.sqlHandler.select_trade_marks_data(self.table_name,
-                                                      _now_tamp)
+        # 存入数据库
+        try:
+            _sr = self.sqlHandler.select_trade_marks_data(
+                self.table_name, _now_tamp)
 
-        # 取出list中最后一个元素，作为交易的时间。
-        _tamp = _sr['result'][len(_sr['result']) - 1][0]
-        params['date_key'] = _tamp
+            # 取出list中最后一个元素，作为交易的时间。
+            _tamp = _sr['result'][len(_sr['result']) - 1][0]
+            params['date_key'] = _tamp
 
-        _ur = self.sqlHandler.update_buy_set(params)
+            _ur = self.sqlHandler.update_buy_set(params)
 
-        if _ur['status']:
-            if is_buy_set == '1':
-                self.buy_times = self.buy_times + 1
+            if _ur['status']:
+                if is_buy_set == '1':
+                    self.buy_times = self.buy_times + 1
+                else:
+                    self.buy_times = 0
+                print('写入结束')
+                print('写入交易点成功，code=', is_buy_set, '。交易时间为：',
+                      self.timeTamp.get_time_normal(_tamp), '交易价格为:',
+                      res['avgPx'])
             else:
-                self.buy_times = 0
-            print('写入结束')
-            print('写入交易点成功，code=', is_buy_set, '。交易时间为：',
-                  self.timeTamp.get_time_normal(_tamp), '交易价格为:', res['avgPx'])
-        else:
-            print('写入交易点失败code=', is_buy_set)
+                print('写入交易点失败code=', is_buy_set)
+        except:
+            print("Error: 请处理", self.timeTamp.get_time_normal(_now_tamp))
 
     def _befor_investment(self, kline_data):
         # 私有函数
@@ -399,6 +432,7 @@ class Trading:
         lever = self.btc_shangzuoliu_001['lever']
         mgnMode = self.btc_shangzuoliu_001['mgnMode']
         _s_p = {'instId': instId, 'lever': lever, 'mgnMode': mgnMode}
+
         self.http.set_account_set_leverage(_s_p)
 
     def _get_trad_sz(self):
@@ -416,6 +450,7 @@ class Trading:
         # 获得野生可购买数量 - 烹饪食材
         _m_a_s_data, error = self.http.get_account_max_avail_size(
             _max_size_params)
+        _m_a_s_data = _m_a_s_data[0]
         _m_s_availBuy = float(_m_a_s_data['availBuy'])  # 获得最大买入数量 ***
         _m_s_availSell = float(_m_a_s_data['availSell'])  # 获得最大卖出数量 ***
         # 获取交易产品基础信息 - 烹饪调料
@@ -423,7 +458,7 @@ class Trading:
             'instType': instType,
             'instId': instId
         })
-        _p_i_lotSz = _p_i_result['lotSz']  # 最小下单数量精度 ***
+        _p_i_lotSz = _p_i_result[0]['lotSz']  # 最小下单数量精度 ***
 
         # 具体可购买数量 - 开启烹饪
         _sz = len(str(_p_i_lotSz).split('.')[1])
@@ -441,7 +476,7 @@ class Trading:
         instId = self.btc_shangzuoliu_001['instId']
         params = {'instId': instId}
         result, error = self.http.market_ticker(params)
-        askPx = result['askPx']
+        askPx = result[0]['askPx']
         return {'askPx': askPx}
 
 if __name__ == "__main__":
@@ -455,5 +490,5 @@ if __name__ == "__main__":
     _ulist = _data['realPay']['children']
     for item in _ulist:
         if item['name'] == 'qassChildrenTwo':
-            trading = Trading(0.05, 0.025, user_info=item)
+            trading = Trading(0.20, 0.025, user_info=item)
             trading._init()

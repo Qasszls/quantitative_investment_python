@@ -10,6 +10,7 @@ import json
 import threading
 
 sys.path.append('..')
+from util.TimeStamp import TimeTamp
 
 
 class SocketApi:
@@ -24,6 +25,8 @@ class SocketApi:
         self.passphrase = user_info['passphrase']
         self.SecretKey = user_info['secret_key']
         self.trading_type = user_info['trading_type']
+
+        self.timeTamp = TimeTamp()
         # loop对象
         self.new_loop_public = None
         self.new_loop_private = None
@@ -33,7 +36,7 @@ class SocketApi:
         # websocket对象
         self.private_w = None
         self.public_w = None
-        # 获取进程锁
+
         self.subscribe_DICT = {
             'positions': self._positions,
             'account': self._account,
@@ -77,7 +80,7 @@ class SocketApi:
                 # 发送send
                 await self.subscribe_DICT[item](_w)
             self.private_w = _w
-            await self._get_recv(_w, 'private')
+            await self._get_recv(_w, 'private', self.new_loop_private)
 
     # 启动公有链接
     async def run_public(self, subscribe, url):
@@ -88,7 +91,7 @@ class SocketApi:
                 await self.subscribe_DICT[item](_w)
 
             self.public_w = _w
-            await self._get_recv(_w, 'public')
+            await self._get_recv(_w, 'public', self.new_loop_public)
 
     # 获得一个在新线程里物阻塞的异步对象
     def _get_thred_loop(self, name):
@@ -113,22 +116,29 @@ class SocketApi:
         new_threading(new_loop)  # 新起一个线程跑异步轮询
         return new_loop
 
-    async def set_hearting(self, _w, _wname, timer):
+    async def set_hearting(self, _w, _wname, loop):
 
-        # 心跳链接试验版
-        if timer == None or (timer and not timer.is_alive()):
-            await _w.send('ping')
-            timer = threading.Timer(25, self._restart_link, (_wname, ))
-            timer.start()
+        # 心跳链接
+        timer = threading.Timer(30, self._restart_link, (_wname, _w, loop))
+        # asyncio.run_coroutine_threadsafe(_w.send('ping'), loop)
+        timer.start()
         return timer
 
     # 接收工具
-    async def _get_recv(self, _w, _wname):
+    async def _get_recv(self, _w, _wname, loop):
         timer = None
+      
         while True:
-            timer = await self.set_hearting(_w, _wname, timer)
+            # 功能块 --- 获取当前时间戳并与开局时间戳比对，当结果小于 2500毫秒时
+            # 便发出心跳问询
+            # 并将此次时间点记录下来，以供下次对比
+            
+            timer = await self.set_hearting(_w, _wname, loop)
             recv_text = await _w.recv()
+            # 当接受到信息，心跳问询结束
             timer.cancel()
+
+            # 消息处理阶段
             if recv_text != 'pong':
                 recv_text = json.loads(recv_text)
                 if 'event' in recv_text:
@@ -139,32 +149,35 @@ class SocketApi:
                     else:
                         print('订阅', recv_text['arg']['channel'], '成功')
                 else:
-                    print('连接中', threading.activeCount())
+                    # print('连接中', threading.activeCount())
                     self.on_handle_message(recv_text)
 
     # 需要重启响应函数
-    def _restart_link(self, _wname):
-        def async_close(_w, loop):
-            future = asyncio.run_coroutine_threadsafe(_w.close(), loop)
-            result = future.result()
-            return result
+    def _restart_link(self, _wname, _w, loop):
+        print('进入重启程序---关闭连接与loop')
 
-        if _wname == "private":
-            async_close(self.private_w, self.new_loop_private)
-            self.private_w = None
-            # print('private_w is close')
-        else:
-            async_close(self.public_w, self.new_loop_public)
-            self.public_w = None
-            # print('public_w is close')
+        def _close(_websocket, _loop):
+            # 关闭 websocket
+            # 停下 loop循环 run_coroutine_threadsafe
+            asyncio.run_coroutine_threadsafe(_websocket.close(),
+                                             _loop).result()
+            _loop.call_soon_threadsafe(_loop.stop)
+            while True:
+                if _loop.is_running() == False:
+                    _loop.close()
+                    if _loop.is_closed() == True:
+                        break
+            if _wname == "private":
+                self.new_loop_private = None
+                self.private_w = None
+            else:
+                self.new_loop_public = None
+                self.public_w = None
 
+        # 关闭连接并清理对应连接对象与loop对象的变量
+        _close(_w, loop)
         params = {'type': 'restart', "data": _wname}
         self.on_handle_message(params)
-
-    # 关闭ws链接
-    def websocket_close(self, subscribe, _w):
-        _w.close()
-        print(subscribe, '已经关闭', _w)
 
     # 频道区
     # 订阅 登录
