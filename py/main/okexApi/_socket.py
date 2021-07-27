@@ -1,5 +1,6 @@
 # -*- coding:UTF-8 -*-
 
+from asyncio.tasks import sleep
 import base64
 import hmac
 import sys
@@ -25,18 +26,12 @@ class SocketApi:
         self.passphrase = user_info['passphrase']
         self.SecretKey = user_info['secret_key']
         self.trading_type = user_info['trading_type']
-
+        # 公有私有频道注册表
+        self.subscribe = user_info['subscribe']
+        # 心跳函数loop
+        self.heart_loop = self._get_thred_loop('    heart   ')  # 记录一下 以免重复创建线程
         self.timeTamp = TimeTamp()
-        # loop对象
-        self.new_loop_public = None
-        self.new_loop_private = None
-        # timer 线程对象
-        self.pri_timer = None
-        self.pub_timer = None
-        # websocket对象
-        self.private_w = None
-        self.public_w = None
-
+        # 各频道send方法
         self.subscribe_DICT = {
             'positions': self._positions,
             'account': self._account,
@@ -47,51 +42,81 @@ class SocketApi:
     def run(self, public_subscribe=None, private_subscribe=None):
         private_url = 'wss://ws.okex.com:8443/ws/v5/private'
         public_url = 'wss://ws.okex.com:8443/ws/v5/public'
-
         # 是否为模拟盘
         if self.trading_type == '0':
             private_url = 'wss://wspap.okex.com:8443/ws/v5/private?brokerId=9999'
             public_url = 'wss://wspap.okex.com:8443/ws/v5/public?brokerId=9999'
+        # 获取一个跑心跳函数的线程
+
         if public_subscribe:
             # 获取一个跑起异步协程的子线程
-            self.new_loop_public = self._get_thred_loop('public')
+            new_loop = self._get_thred_loop('public---' + public_subscribe)
             # 扔到对应线程异步里去
             asyncio.run_coroutine_threadsafe(
-                self.run_public(public_subscribe, public_url),
-                self.new_loop_public)
+                self.run_public(public_subscribe, public_url, new_loop,
+                                self.heart_loop), new_loop)
 
         if private_subscribe:
             # 获取一个跑起异步协程的子线程
-            self.new_loop_private = self._get_thred_loop('private')
+            new_loop = self._get_thred_loop('private---' + private_subscribe)
             # 扔到对应线程异步里去
             asyncio.run_coroutine_threadsafe(
-                self.run_private(private_subscribe, private_url),
-                self.new_loop_private)
+                self.run_private(private_subscribe, private_url, new_loop,
+                                 self.heart_loop), new_loop)
 
     # 启动私有链接
-    async def run_private(self, subscribe, url):
-        async with websockets.connect(url) as _w:
-            # 登录账户
-            status = await self.login(_w)
-            if not status:
-                print('登录失败')
-                return
-            for item in subscribe:
-                # 发送send
-                await self.subscribe_DICT[item](_w)
-            self.private_w = _w
-            await self._get_recv(_w, 'private', self.new_loop_private)
+    async def run_private(self, subscribe, url, new_loop, heart_loop):
+        try:
+            async with websockets.connect(url) as _w:
+                # 登录账户
+                status = await self.login(_w)
+                if not status:
+                    print('登录失败')
+                    return
+
+                await self.subscribe_DICT[subscribe](_w)
+                # 配置心跳函数
+                threading.Timer(20, self.set_hearting,
+                                (_w, heart_loop, subscribe)).start()
+                await self._get_recv(_w, subscribe, new_loop)
+        except BaseException as err:
+            await asyncio.sleep(2)
+            print('网络问题,', subscribe, '重启')
+            asyncio.run_coroutine_threadsafe(
+                self.run_private(subscribe, url, new_loop, heart_loop),
+                new_loop)
 
     # 启动公有链接
-    async def run_public(self, subscribe, url):
-        # 注册公共socket
-        async with websockets.connect(url) as _w:
-            for item in subscribe:
-                # 发送send
-                await self.subscribe_DICT[item](_w)
+    async def run_public(self, subscribe, url, new_loop, heart_loop):
+        try:
+            # 注册公共socket
+            async with websockets.connect(url) as _w:
+                await self.subscribe_DICT[subscribe](_w)
+                # 配置心跳函数
+                threading.Timer(20, self.set_hearting,
+                                (_w, heart_loop, subscribe)).start()
+                await self._get_recv(_w, subscribe, new_loop)
+        except BaseException as err:
+            await asyncio.sleep(2)
+            print('网络问题,', subscribe, '重启')
+            asyncio.run_coroutine_threadsafe(
+                self.run_public(subscribe, url, new_loop, heart_loop),
+                new_loop)
 
-            self.public_w = _w
-            await self._get_recv(_w, 'public', self.new_loop_public)
+    # 心跳函数
+    def set_hearting(self, _w, loop, subscribe):
+        # 如果 链接打开着
+        if _w.state.name == "OPEN":
+            # 在心跳线程中塞入一个ping事件
+            asyncio.run_coroutine_threadsafe(self._do_send(_w, 'ping'),
+                                             loop).result()
+            # # 五秒后在执行一遍我自己
+            threading.Timer(20, self.set_hearting,
+                            (_w, loop, subscribe)).start()
+
+    # 归属私有频道还是公有频道
+    def is_public(self, _s):
+        return _s in self.subscribe['public']
 
     # 获得一个在新线程里物阻塞的异步对象
     def _get_thred_loop(self, name):
@@ -116,28 +141,12 @@ class SocketApi:
         new_threading(new_loop)  # 新起一个线程跑异步轮询
         return new_loop
 
-    async def set_hearting(self, _w, _wname, loop):
-
-        # 心跳链接
-        timer = threading.Timer(30, self._restart_link, (_wname, _w, loop))
-        # asyncio.run_coroutine_threadsafe(_w.send('ping'), loop)
-        timer.start()
-        return timer
-
     # 接收工具
-    async def _get_recv(self, _w, _wname, loop):
+    async def _get_recv(self, _w, subscribe, loop):
+        global timer
         timer = None
-      
         while True:
-            # 功能块 --- 获取当前时间戳并与开局时间戳比对，当结果小于 2500毫秒时
-            # 便发出心跳问询
-            # 并将此次时间点记录下来，以供下次对比
-            
-            timer = await self.set_hearting(_w, _wname, loop)
             recv_text = await _w.recv()
-            # 当接受到信息，心跳问询结束
-            timer.cancel()
-
             # 消息处理阶段
             if recv_text != 'pong':
                 recv_text = json.loads(recv_text)
@@ -146,14 +155,17 @@ class SocketApi:
                         print(
                             '订阅',
                             recv_text['msg'] + '失败，错误码为：' + recv_text['code'])
+                        self._restart_link, (_w, subscribe, loop)
                     else:
                         print('订阅', recv_text['arg']['channel'], '成功')
                 else:
-                    # print('连接中', threading.activeCount())
+                    # print('连接中', len(threading.enumerate()), subscribe)
                     self.on_handle_message(recv_text)
+            # else:
+            # print(recv_text + subscribe)
 
     # 需要重启响应函数
-    def _restart_link(self, _wname, _w, loop):
+    def _restart_link(self, _w, subscribe, loop):
         print('进入重启程序---关闭连接与loop')
 
         def _close(_websocket, _loop):
@@ -167,16 +179,10 @@ class SocketApi:
                     _loop.close()
                     if _loop.is_closed() == True:
                         break
-            if _wname == "private":
-                self.new_loop_private = None
-                self.private_w = None
-            else:
-                self.new_loop_public = None
-                self.public_w = None
 
         # 关闭连接并清理对应连接对象与loop对象的变量
         _close(_w, loop)
-        params = {'type': 'restart', "data": _wname}
+        params = {'type': 'restart', "data": subscribe}
         self.on_handle_message(params)
 
     # 频道区

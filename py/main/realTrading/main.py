@@ -31,7 +31,7 @@ class Trading:
                  checkSurplus,
                  stopLoss,
                  mode=None,
-                 odds=0.03,
+                 odds=0.05,
                  lever=3,
                  user_info=None):
         if not user_info:
@@ -67,9 +67,9 @@ class Trading:
         # self.ema26 = 29671.5
         # self.dea = -15.1924
         # 15m
-        self.ema12 = 31496.9
-        self.ema26 = 31285.7
-        self.dea = 234.1
+        self.ema12 = 37124.7
+        self.ema26 = 37112.6
+        self.dea = 17.1
         self.old_kl = []
         # 对照字典表
         self.channel_Dict = {
@@ -93,46 +93,54 @@ class Trading:
             'slTriggerRate': self.stopLoss,  # 止损
             'ordType':
             'market',  # 倾向策略方式 conditional：单向止盈止损、oco：双向止盈止损、trigger：计划委托
-            'subscribe': {
-                '_private': ['account', 'positions'],
-                '_public': ['market']
-            },  # 监听的频道列表
+            'subscribe': user_info['subscribe'],  # 监听的频道列表
         }
 
-    def query(self, channel):
-        if channel in self.channel_Dict:
-            return self.channel_Dict[channel]
-        elif re.search('candle', channel).group():
-            return self.channel_Dict['candle']
-        else:
-            print('调用错误')
-            return False
+    # 是否是公共频道
+    def is_public(self, _s):
+        public_subscribe = self.btc_shangzuoliu_001['subscribe']['public']
+        return _s in public_subscribe
 
     # 推送路由
     def _router(self, res):
+        def query(channel):
+            if channel in self.channel_Dict:
+                return self.channel_Dict[channel]
+            elif re.search('candle', channel).group():
+                return self.channel_Dict['candle']
+            else:
+                print('调用错误')
+                return False
+
         # 自定义回调数据
         if 'type' in res:
-            _fun = self.query(res['type'])
+            _fun = query(res['type'])
             _fun(res['data'])
         else:
             # okex 回调数据
             channel = res['arg']['channel']
-            data = res['data'][0]
-            _fun = self.query(channel)
-            _fun(data)
+            # 如果回调数据 data长度为0，说明暂无数据，调用无效
+            if len(res['data']) == 0:
+                return
+            else:
+                data = res['data'][0]
+                _fun = query(channel)
+                _fun(data)
 
     # 主函数
     def _init(self):
         self._set_lever()
         #配置私有公有链接的频道
-        _pri = self.btc_shangzuoliu_001['subscribe']['_private']
-        _pub = self.btc_shangzuoliu_001['subscribe']['_public']
-        self.socket.run(public_subscribe=_pub)
-        self.socket.run(private_subscribe=_pri)
+        _pri = self.btc_shangzuoliu_001['subscribe']['private']
+        _pub = self.btc_shangzuoliu_001['subscribe']['public']
+        for item in _pub:
+            self.socket.run(public_subscribe=item)
+        for item in _pri:
+            self.socket.run(private_subscribe=item)
 
         # while True:
-        #     time.sleep(2)
-        #     print('\n 子线程', threading.enumerate())
+        #     time.sleep(5)
+        #     print('\n 子线程', len(threading.enumerate()))
 
     # 更新持仓数据
     def update_position(self, data):
@@ -140,18 +148,16 @@ class Trading:
             return self.uplRatio >= self.checkSurplus
 
         def _is_sotpLoss():
-            return self.uplRatio <= self.stopLoss
+            return self.uplRatio >= self.stopLoss
 
         self.upl = float(data['upl'])
         self.uplRatio = float(data['uplRatio'])
-
         # 检测止盈止损
         if _is_checkSurplus() or _is_sotpLoss():
             self.allSell()
 
     # 更新用户数据
     def update_user(self, data):
-
         # 获取用户的USDT的币种余额
         def _get_usdt(_detail):
             for _coin in _detail:
@@ -159,36 +165,43 @@ class Trading:
                     return _coin['cashBal']
             print('未获取到USDT余额')
 
-        _detail = data['detail']
-
+        _detail = data['details']
         self._c = _get_usdt(_detail)  # 更新用户的USDT的币种余额
 
     # 重启策略
-    def restart(self, _wname):
-        print('星球重启---相机开启新的连接')
-        _ures, error = self.http.get_update_status()
-        if not error and len(_ures) > 0 and _ures['state'] == 'ongoing':
-            _udate_start = _ures['start']  # 服务器更新完成时间
-            _udate_end = _ures['end']  # 服务器更新完成时间
+    def restart(self, subscribe):
+        def _restart(_s):
+            if self.is_public(_s):
+                print('重启公有星球')
+                self.socket.run(public_subscribe=_s)
+            else:
+                print('重启私有星球')
+                self.socket.run(private_subscribe=_s)
 
-            print(_ures, '服务器返回数据', '更新开始时间: ',
-                  self.timeTamp.get_time_normal(_udate_start), '更新结束时间: ',
-                  self.timeTamp.get_time_normal(_udate_end))
-            # 服务器正在更新
-            print(_ures, '更新中，谨慎恢复')
+        print('星球重启---开启新的征程, 子线程', len(threading.enumerate()))
+        _ures, error = self.http.get_update_status()
+        if not error and len(_ures) > 0:
+            _udate_start = None
+            _udate_end = None
+            for item in _ures:
+                if item['state'] == 'ongoing':
+                    _udate_start = _ures['start']  # 服务器更新完成时间
+                    _udate_end = _ures['end']  # 服务器更新完成时间
+                    print(_ures, '服务器返回数据', '更新开始时间: ',
+                          self.timeTamp.get_time_normal(_udate_start),
+                          '更新结束时间: ',
+                          self.timeTamp.get_time_normal(_udate_end))
+                    # 服务器正在更新
+                    print(_ures, '更新中，谨慎恢复')
+                    return
+            _restart(subscribe)
+
         elif error:
             # 网络问题 轮询请求接口，等待网络恢复
-            print(error)
-            time.sleep(2)
-            self.restart(_wname)
+            time.sleep(10)
+            self.restart(subscribe)
         else:
-            print('重启星球')
-            _pri = self.btc_shangzuoliu_001['subscribe']['_private']
-            _pub = self.btc_shangzuoliu_001['subscribe']['_public']
-            if _wname == 'private':
-                self.socket.run(private_subscribe=_pri)
-            else:
-                self.socket.run(public_subscribe=_pub)
+            _restart(subscribe)
 
         # 是服务器的原因 还是 网络的原因
         # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
@@ -299,6 +312,7 @@ class Trading:
             'ccy': ccy,
         }
         # 下订单-市价买入
+        print('下订单-市价买入')
         res, error = self.http.trade_order(params)
 
         if error:
@@ -324,9 +338,10 @@ class Trading:
             'ccy': ccy,
         }
         # 下订单-市价平仓
+        print('下订单-市价平仓')
         res, error = self.http.close_position(params)
         if error:
-            print('sell error')
+            print('sell error', res)
             self._trading_record(ordId=None, is_buy_set='0')
             return
         else:
@@ -432,8 +447,10 @@ class Trading:
         lever = self.btc_shangzuoliu_001['lever']
         mgnMode = self.btc_shangzuoliu_001['mgnMode']
         _s_p = {'instId': instId, 'lever': lever, 'mgnMode': mgnMode}
-
-        self.http.set_account_set_leverage(_s_p)
+        res, err = self.http.set_account_set_leverage(_s_p)
+        if err:
+            time.sleep(2)
+            self._set_lever()
 
     def _get_trad_sz(self):
         instId = self.btc_shangzuoliu_001['instId']
@@ -448,12 +465,14 @@ class Trading:
         if tdMode == 'cross':
             _max_size_params['ccy'] = ccy
         # 获得野生可购买数量 - 烹饪食材
+        print('获得野生可购买数量 - 烹饪食材')
         _m_a_s_data, error = self.http.get_account_max_avail_size(
             _max_size_params)
         _m_a_s_data = _m_a_s_data[0]
         _m_s_availBuy = float(_m_a_s_data['availBuy'])  # 获得最大买入数量 ***
         _m_s_availSell = float(_m_a_s_data['availSell'])  # 获得最大卖出数量 ***
         # 获取交易产品基础信息 - 烹饪调料
+        print('获取交易产品基础信息 - 烹饪调料')
         _p_i_result, error = self.http.get_public_instruments({
             'instType': instType,
             'instId': instId
@@ -483,12 +502,13 @@ if __name__ == "__main__":
     # 获取要执行的用户配置
 
     # macd 底背离
-    f = open('../config.json', 'r')
+    f = open('../config.json', 'r', encoding='utf-8')
     _data = json.load(f)
-    # trading = Trading(0.16, 0.075, user_info=_data['realPay'])
-    # trading._init()
-    _ulist = _data['realPay']['children']
-    for item in _ulist:
-        if item['name'] == 'qassChildrenTwo':
-            trading = Trading(0.20, 0.025, user_info=item)
-            trading._init()
+    _ulist = _data['realPay']
+    # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
+    trading = Trading(0.05, 0.02, user_info=_ulist, mode='loose')
+    trading._init()
+    # for item in _ulist['children']:
+    #     if item['name'] == 'qassChildrenTwo':
+    #         trading = Trading(1.2, 0.20, user_info=item)
+    #         trading._init()

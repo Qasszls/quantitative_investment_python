@@ -49,13 +49,13 @@ for item in kline:
 """
 from os import close
 import sys
-import talib
+# import talib
 import pandas as pd
 import emoji
 
 import time
 
-talib.OBV
+# talib.OBV
 
 sys.path.append('..')
 from util.TimeStamp import TimeTamp
@@ -251,7 +251,7 @@ class SimpleMacd():
             if self._is_golden_cross(macdDist['macd']):
                 if self._is_white_line_up() and self._is_down_channel():
                     self.step = 9999
-                elif self.mode == 'strict' and self._loose_deviate_from():
+                elif self.mode != 'strict' and self._loose_deviate_from():
                     self.step = 9999
                 else:
                     self.step = 2
