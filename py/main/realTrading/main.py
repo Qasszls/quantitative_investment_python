@@ -31,7 +31,6 @@ class Trading:
             print('请填写用户信息')
             return
 
-        self.table_name = user_info['table_name']
 
         self.simpleMacd = SimpleMacd(mode, odds)
         self.socket = SocketApi(on_message=self._router,
