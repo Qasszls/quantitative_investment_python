@@ -1,6 +1,6 @@
 # -*- coding:UTF-8 -*-
 
-from asyncio.tasks import sleep
+from dingtalkchatbot.chatbot import DingtalkChatbot
 import base64
 import hmac
 import sys
@@ -128,7 +128,8 @@ class SocketApi:
                 # 开启消息监听
                 await self._get_recv(_w, subscribe)
         except BaseException as err:
-            print('出现问题,', subscribe, '重启', str(err))
+            self.dingding_msg(subscribe + '出现问题,进行重启。', str(err))
+            # print('出现问题,', subscribe, '重启', str(err))
             await self._restart_link(websocket, subscribe, loop)
 
     # 启动公有链接
@@ -148,8 +149,16 @@ class SocketApi:
                 # 开启消息监听
                 await self._get_recv(_w, subscribe)
         except BaseException as err:
-            print('出现问题,', subscribe, '重启', str(err))
+            self.dingding_msg(subscribe + '出现问题,进行重启。', str(err))
+            # print('出现问题,', subscribe, '重启', str(err))
             await self._restart_link(websocket, subscribe, loop)
+
+    # 钉钉消息助手
+    def dingding_msg(self, text):
+        webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
+        ding = DingtalkChatbot(webhook)
+        text = text + ' :525'
+        ding.send_text(msg=text, is_at_all=False)
 
     # 获得一个在新线程里物阻塞的异步对象
     def _get_thred_loop(self, name):
@@ -182,6 +191,7 @@ class SocketApi:
     # 接收工具
     async def _get_recv(self, _w, subscribe):
         while subscribe in self.subscribe_INFO:
+            await asyncio.sleep(1)
             recv_text = await _w.recv()
             # 消息处理阶段
             if recv_text != 'pong':
@@ -192,7 +202,9 @@ class SocketApi:
                             '订阅',
                             recv_text['msg'] + '失败，错误码为：' + recv_text['code'])
                     else:
-                        print('订阅', recv_text['arg']['channel'], '成功')
+                        self.dingding_msg('订阅' + recv_text['arg']['channel'] +
+                                          '成功')
+                        # print('订阅', recv_text['arg']['channel'], '成功')
                 else:
                     # print('连接中', len(threading.enumerate()), subscribe)
                     self.on_handle_message(recv_text)
@@ -219,7 +231,8 @@ class SocketApi:
             params = {'type': 'restart', "data": subscribe}
             self.on_handle_error(params)
         except BaseException as err:
-            print('重启程序出现问题')
+            self.dingding_msg('重启程序出现问题: ' + str(err))
+            # print('重启程序出现问题')
 
     # 频道区
     # 订阅 登录

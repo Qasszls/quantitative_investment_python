@@ -1,6 +1,6 @@
 # -*- coding:UTF-8 -*-
 
-from numpy.lib.npyio import loads
+from dingtalkchatbot.chatbot import DingtalkChatbot
 import pandas as pd
 import numpy as np
 import emoji
@@ -11,11 +11,6 @@ import asyncio
 import re
 import json
 import gc
-
-from tqdm import tqdm
-
-# import pyecharts.options as opts
-# from pyecharts.charts import Line
 
 sys.path.append('..')
 from util.TimeStamp import TimeTamp
@@ -56,8 +51,8 @@ class Trading:
         self.checkSurplus = checkSurplus  # 玩家止盈率
         self.stopLoss = stopLoss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
-        self.upl = ''  # 未实现收益
-        self.uplRatio = ''  # 未实现收益率
+        # self.upl = ''  # 未实现收益
+        # self.uplRatio = ''  # 未实现收益率
         #用户层面
         self._c = 0  # 现金余额 - 默认为USDT
 
@@ -68,9 +63,9 @@ class Trading:
         # self.ema26 = 29671.5
         # self.dea = -15.1924
         # 15m
-        self.ema12 = 39757.7
-        self.ema26 = 39777.0
-        self.dea = -15.1
+        self.ema12 = 39707.8
+        self.ema26 = 39736.5
+        self.dea = -31.5827
         self.old_kl = []
         # 对照字典表
         self.channel_Dict = {
@@ -136,19 +131,20 @@ class Trading:
             self.socket.run(private_subscribe=item)
 
         while True:
-            time.sleep(900)
             self.get_systm_status()
+            time.sleep(1800)
 
     # 更新持仓数据
     def update_position(self, data):
+        self.upl = float(data['upl'])
+        uplRatio = abs(float(data['uplRatio']))
+
         def _is_checkSurplus():
-            return self.uplRatio >= self.checkSurplus
+            return uplRatio >= self.checkSurplus
 
         def _is_sotpLoss():
-            return self.uplRatio >= self.stopLoss
+            return uplRatio >= self.stopLoss
 
-        self.upl = float(data['upl'])
-        self.uplRatio = float(data['uplRatio'])
         # 检测止盈止损
         if _is_checkSurplus() or _is_sotpLoss():
             self.allSell()
@@ -169,13 +165,15 @@ class Trading:
     def restart(self, _res):
         subscribe = _res['data']
         if self.is_public(subscribe):
-            print('重启公有星球')
+            self.dingding_msg('重启公有星球')
+            time.sleep(5)
             self.socket.run(public_subscribe=subscribe)
         else:
-            print('重启私有星球')
+            self.dingding_msg('重启私有星球')
+            time.sleeo(5)
             self.socket.run(private_subscribe=subscribe)
 
-        print('星球重启---开启新的征程', gc.collect())
+        # print('星球重启---开启新的征程', gc.collect())
 
     # 是服务器的原因 还是 网络的原因
     # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
@@ -194,6 +192,11 @@ class Trading:
     # 2.调用 socket.run 方法重启被中断的链接
 
     # 策略核心内容
+    def dingding_msg(self, text, flag=False):
+        webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
+        ding = DingtalkChatbot(webhook)
+        text = text + ' :525'
+        ding.send_text(msg=text, is_at_all=flag)
 
     def breathing(self, kline_data):
         # 判断新老数据
@@ -264,7 +267,9 @@ class Trading:
         # 装车
         res = self.sqlHandler.insert_trade_marks_data(_kline_list,
                                                       self.table_name)
-        print('完成节点:', self.timeTamp.get_time_normal(id_tamp))
+        # self.dingding_msg('完成节点:' + self.timeTamp.get_time_normal(id_tamp))
+
+        # print('完成节点:'+ self.timeTamp.get_time_normal(id_tamp))
 
     # 下单
     def allBuy(self):
@@ -291,12 +296,11 @@ class Trading:
         res, error = self.http.trade_order(params)
 
         if error:
-            print('buy error')
+            self.dingding_msg('买入失败' + str(error), True)
+
             return
         else:
-            if len(res) == 0:
-                print('买单无数据')
-                return
+            self.dingding_msg('买入成功' + str(res), True)
             self._trading_record(ordId=res[0]['ordId'], is_buy_set='1')
 
     def allSell(self):
@@ -314,13 +318,15 @@ class Trading:
         }
         # 下订单-市价平仓
         print('下订单-市价平仓')
-        res, error = self.http.close_position(params)
-        if error:
-            print('sell error', res)
+        res, err = self.http.close_position(params)
+        if err:
+            # print('sell error', res)
+            self.dingding_msg('卖出失败，请手动平仓' + str(err), True)
             self._trading_record(ordId=None, is_buy_set='0')
             return
         else:
-            print('sell')
+
+            self.dingding_msg('卖出成功' + str(res), True)
             self._trading_record(ordId=None, is_buy_set='0')
 
     # 记录交易点
@@ -381,17 +387,19 @@ class Trading:
                 if item['state'] == 'ongoing':
                     _udate_start = _ures['start']  # 服务器更新完成时间
                     _udate_end = _ures['end']  # 服务器更新完成时间
-                    print(_ures, '服务器返回数据', '更新开始时间: ',
-                          self.timeTamp.get_time_normal(_udate_start),
-                          '更新结束时间: ',
-                          self.timeTamp.get_time_normal(_udate_end))
+                    self.dingding_msg(
+                        _ures, '服务器返回数据', '更新开始时间: ',
+                        self.timeTamp.get_time_normal(_udate_start),
+                        '更新结束时间: ', self.timeTamp.get_time_normal(_udate_end))
                     # 服务器正在更新
                     print(_ures, '更新中，谨慎恢复')
                     return
         elif error:
             # 网络问题 轮询请求接口，等待网络恢复
-            time.sleep(20)
+            print('get_systm_status 出现问题')
             self.get_systm_status()
+        else:
+            self.dingding_msg('服务器没有更新计划')
 
     def _befor_investment(self, kline_data):
         # 私有函数
