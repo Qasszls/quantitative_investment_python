@@ -17,7 +17,6 @@ from util.TimeStamp import TimeTamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from okexApi._socket import SocketApi
 from okexApi._http import HttpApi
-from sqlHandler import SqlHandler
 
 
 class Trading:
@@ -40,13 +39,6 @@ class Trading:
                                 user_info=user_info)  # 初始化长连接
         self.http = HttpApi(user_info=user_info)  # 初始化短连接
         self.timeTamp = TimeTamp()  # 初始化时间操作对象
-        self.sqlHandler = SqlHandler(  # 初始化数据库操作对象
-            ip='127.0.0.1',
-            userName='root',
-            userPass='qass-utf-8',
-            DBName='BTC-USDT_kline',
-            charset='utf8',
-        )
 
         self.checkSurplus = checkSurplus  # 玩家止盈率
         self.stopLoss = stopLoss  # 玩家止损率
@@ -173,8 +165,6 @@ class Trading:
             time.sleeo(5)
             self.socket.run(private_subscribe=subscribe)
 
-        # print('星球重启---开启新的征程', gc.collect())
-
     # 是服务器的原因 还是 网络的原因
     # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
     # 否则如果是私有频道，直接恢复
@@ -247,31 +237,6 @@ class Trading:
             #买入 钩子
             self.allBuy()
 
-        # 数据装车
-        # 把用户与行情数据存入
-        _kline_list = kline_data
-        # 回测数据--数据打包
-        _kline_list.update({
-            'date': self.timeTamp.get_time_normal(id_tamp),
-            'is_buy_set': 'wait'
-        })
-
-        # 行情数据———macd 打包
-        _kline_list.update({
-            'dif': macd_data['dif'],
-            "dea": macd_data['dea'],
-            "macd": macd_data['macd'],
-            "bar": macd_data['bar'] * 2
-        })
-        # 自定义数据 -- 研判步骤 打包
-        _kline_list['step'] = str(_step)
-        # 装车
-        res = self.sqlHandler.insert_trade_marks_data(_kline_list,
-                                                      self.table_name)
-        # self.dingding_msg('完成节点:' + self.timeTamp.get_time_normal(id_tamp))
-
-        # print('完成节点:'+ self.timeTamp.get_time_normal(id_tamp))
-
     # 下单
     def allBuy(self):
         result = self._get_trad_sz()
@@ -294,13 +259,10 @@ class Trading:
         }
         # 下订单-市价买入
         res, error = self.http.trade_order(params)
-        print(res, error)
         if error:
             self.dingding_msg('买入失败' + str(error))
-            return
         else:
             self.dingding_msg('买入成功' + str(res))
-            self._trading_record(ordId=res[0]['ordId'], is_buy_set='1')
 
     def allSell(self):
 
@@ -316,67 +278,11 @@ class Trading:
             'ccy': ccy,
         }
         # 下订单-市价平仓
-        print('下订单-市价平仓')
         res, err = self.http.close_position(params)
         if err:
-            # print('sell error', res)
             self.dingding_msg('卖出失败，请手动平仓' + str(err))
-            self._trading_record(ordId=None, is_buy_set='0')
-            return
         else:
-
             self.dingding_msg('卖出成功' + str(res))
-            self._trading_record(ordId=None, is_buy_set='0')
-
-    # 记录交易点
-    def _trading_record(self, ordId, is_buy_set):
-        params = (self.table_name, {
-            'is_buy_set': is_buy_set,
-            'date_key': None
-        })
-        _now_tamp = None
-        # 有订单ID，正常下单
-        if ordId:
-            instId = self.btc_shangzuoliu_001['instId']
-            res, error = self.http.search_order({
-                'instId': instId,
-                'ordId': ordId
-            })
-            if res:
-                _data = res[0]
-                if self.buy_times > 1:
-                    _now_tamp = _data['cTime']
-                else:
-                    _now_tamp = _data['uTime']
-        # 没有订单ID，市价全平
-        else:
-            res, error = self.http.get_public_time()
-            _now_tamp = res[0]['ts']
-
-        # 存入数据库
-        try:
-            _sr = self.sqlHandler.select_trade_marks_data(
-                self.table_name, _now_tamp)
-
-            # 取出list中最后一个元素，作为交易的时间。
-            _tamp = _sr['result'][len(_sr['result']) - 1][0]
-            params['date_key'] = _tamp
-
-            _ur = self.sqlHandler.update_buy_set(params)
-
-            if _ur['status']:
-                if is_buy_set == '1':
-                    self.buy_times = self.buy_times + 1
-                else:
-                    self.buy_times = 0
-                print('写入结束')
-                print('写入交易点成功，code=', is_buy_set, '。交易时间为：',
-                      self.timeTamp.get_time_normal(_tamp), '交易价格为:',
-                      res['avgPx'])
-            else:
-                print('写入交易点失败code=', is_buy_set)
-        except:
-            print("Error: 请处理", self.timeTamp.get_time_normal(_now_tamp))
 
     # 获取服务器更新节点
     def get_systm_status(self):
@@ -398,7 +304,7 @@ class Trading:
             print('get_systm_status 出现问题')
             self.get_systm_status()
         else:
-            self.dingding_msg('服务器没有更新计划')
+            self.dingding_msg('策略运行中，服务器没有更新计划')
 
     def _befor_investment(self, kline_data):
         # 私有函数
@@ -449,10 +355,7 @@ class Trading:
         lever = self.btc_shangzuoliu_001['lever']
         mgnMode = self.btc_shangzuoliu_001['mgnMode']
         _s_p = {'instId': instId, 'lever': lever, 'mgnMode': mgnMode}
-        res, err = self.http.set_account_set_leverage(_s_p)
-        if err:
-            time.sleep(2)
-            self._set_lever()
+        self.http.set_account_set_leverage(_s_p)
 
     def _get_trad_sz(self):
         instId = self.btc_shangzuoliu_001['instId']
@@ -492,14 +395,6 @@ class Trading:
             'availSell': _m_s_availSell,
         }
 
-    # 获取最新成交价 askPx/bidPx
-    def _get_market_ticker(self):
-        instId = self.btc_shangzuoliu_001['instId']
-        params = {'instId': instId}
-        result, error = self.http.market_ticker(params)
-        askPx = result[0]['askPx']
-        return {'askPx': askPx}
-
 if __name__ == "__main__":
     # 获取要执行的用户配置
 
@@ -508,9 +403,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.05, 0.02, user_info=_ulist, mode='loose')
+    trading = Trading(0.12, 0.06, user_info=_ulist, mode='loose')
     trading._init()
-    # for item in _ulist['children']:
-    #     if item['name'] == 'qassChildrenTwo':
-    #         trading = Trading(1.2, 0.20, user_info=item)
-    #         trading._init()
