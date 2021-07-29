@@ -26,7 +26,7 @@ class Trading:
                  stopLoss,
                  mode=None,
                  odds=0.05,
-                 lever=5,
+                 lever=2,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
@@ -196,6 +196,7 @@ class Trading:
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
         text = text + ' :525'
+        print(text, flag)
         ding.send_text(msg=text, is_at_all=flag)
 
     def breathing(self, kline_data):
@@ -294,13 +295,12 @@ class Trading:
         # 下订单-市价买入
         print('下订单-市价买入')
         res, error = self.http.trade_order(params)
-
+        print(res, error)
         if error:
-            self.dingding_msg('买入失败' + str(error), True)
-
+            self.dingding_msg('买入失败' + str(error))
             return
         else:
-            self.dingding_msg('买入成功' + str(res), True)
+            self.dingding_msg('买入成功' + str(res))
             self._trading_record(ordId=res[0]['ordId'], is_buy_set='1')
 
     def allSell(self):
@@ -321,12 +321,12 @@ class Trading:
         res, err = self.http.close_position(params)
         if err:
             # print('sell error', res)
-            self.dingding_msg('卖出失败，请手动平仓' + str(err), True)
+            self.dingding_msg('卖出失败，请手动平仓' + str(err))
             self._trading_record(ordId=None, is_buy_set='0')
             return
         else:
 
-            self.dingding_msg('卖出成功' + str(res), True)
+            self.dingding_msg('卖出成功' + str(res))
             self._trading_record(ordId=None, is_buy_set='0')
 
     # 记录交易点
