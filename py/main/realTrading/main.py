@@ -276,7 +276,7 @@ class Trading:
     def allBuy(self):
         result = self._get_trad_sz()
         action = 'buy'
-        availBuy = result['availBuy']  # 当前币对最大可用的数量
+        availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
         # 获取变量
         instId = self.btc_shangzuoliu_001['instId']
         tdMode = self.btc_shangzuoliu_001['tdMode']
@@ -289,11 +289,10 @@ class Trading:
             'tdMode': tdMode,
             'side': action,
             'ordType': ordType,
-            'sz': availBuy * 2,
+            'sz': availBuy * self.lever * 0.50,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
             'ccy': ccy,
         }
         # 下订单-市价买入
-        print('下订单-市价买入')
         res, error = self.http.trade_order(params)
         print(res, error)
         if error:
