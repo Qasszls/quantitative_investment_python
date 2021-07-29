@@ -9,14 +9,16 @@ import time
 import websockets
 import json
 import threading
+import gc
 
 sys.path.append('..')
 from util.TimeStamp import TimeTamp
 
 
 class SocketApi:
-    def __init__(self, callback, user_info=None):
-        self.on_handle_message = callback
+    def __init__(self, on_message, on_error, user_info=None):
+        self.on_handle_message = on_message
+        self.on_handle_error = on_error
 
         # 加载配置文件
         # user_info
@@ -29,8 +31,13 @@ class SocketApi:
         # 公有私有频道注册表
         self.subscribe = user_info['subscribe']
         # 心跳函数loop
-        self.heart_loop = self._get_thred_loop('    heart   ')  # 记录一下 以免重复创建线程
+        asyncio.run_coroutine_threadsafe(self.set_hearting(),
+                                         self._get_thred_loop('    heart   '))
+        # #获取线程锁
+        self.threadLock = threading.RLock()
         self.timeTamp = TimeTamp()
+        # 注册本---心跳函数
+        self.subscribe_INFO = {}
         # 各频道send方法
         self.subscribe_DICT = {
             'positions': self._positions,
@@ -46,77 +53,103 @@ class SocketApi:
         if self.trading_type == '0':
             private_url = 'wss://wspap.okex.com:8443/ws/v5/private?brokerId=9999'
             public_url = 'wss://wspap.okex.com:8443/ws/v5/public?brokerId=9999'
-        # 获取一个跑心跳函数的线程
-
         if public_subscribe:
             # 获取一个跑起异步协程的子线程
-            new_loop = self._get_thred_loop('public---' + public_subscribe)
+            new_loop = self._get_thred_loop('---public---' + public_subscribe +
+                                            '---')
             # 扔到对应线程异步里去
             asyncio.run_coroutine_threadsafe(
-                self.run_public(public_subscribe, public_url, new_loop,
-                                self.heart_loop), new_loop)
+                self.run_public(public_subscribe, public_url, new_loop),
+                new_loop)
 
         if private_subscribe:
             # 获取一个跑起异步协程的子线程
-            new_loop = self._get_thred_loop('private---' + private_subscribe)
+            new_loop = self._get_thred_loop('---private---' +
+                                            private_subscribe + '---')
             # 扔到对应线程异步里去
             asyncio.run_coroutine_threadsafe(
-                self.run_private(private_subscribe, private_url, new_loop,
-                                 self.heart_loop), new_loop)
+                self.run_private(private_subscribe, private_url, new_loop),
+                new_loop)
+
+        # 心跳函数
+    async def set_hearting(self):
+        # 如果 链接打开着
+        while True:
+            time.sleep(25)
+            gc.collect()
+            self.threadLock.acquire()
+            dict = self.subscribe_INFO.copy()
+            try:
+                if len(dict) > 0:
+                    for _k, _v in dict.items():
+                        _w = _v[0]
+                        subscribe = _v[1]
+                        loop = _v[2]
+                        status = _v[3]
+                        # pong 通了
+                        if _w.state.name == "OPEN":
+                            if status != None:  # 进入心跳循环流程
+                                # 更新状态
+                                dict[_k][3] = None
+                                # 在心跳线程中塞入一个ping事件
+                                await self._do_send(_w, 'ping')
+                            elif status == None:  # 进入重启流程
+                                self.subscribe_INFO.pop(subscribe)
+                                await asyncio.sleep(1)
+                                await self._restart_link(_w, subscribe, loop)
+
+            except BaseException as err:
+                print('心跳函数发生错误', str(err))
+                self.threadLock.release()
+            finally:
+                del dict
+                self.threadLock.release()
 
     # 启动私有链接
-    async def run_private(self, subscribe, url, new_loop, heart_loop):
+    async def run_private(self, subscribe, url, loop):
+
         try:
+            websocket = None
             async with websockets.connect(url) as _w:
                 # 登录账户
+                websocket = _w
                 status = await self.login(_w)
                 if not status:
                     print('登录失败')
                     return
-
+                # 发起订阅请求
                 await self.subscribe_DICT[subscribe](_w)
-                # 配置心跳函数
-                threading.Timer(20, self.set_hearting,
-                                (_w, heart_loop, subscribe)).start()
-                await self._get_recv(_w, subscribe, new_loop)
+
+                # 注册心跳表 (websocket,频道名,事件循环对象,状态)
+                # 清理对应频道的注册表
+                self.threadLock.acquire()
+                self.subscribe_INFO[subscribe] = [_w, subscribe, loop, 'start']
+                self.threadLock.release()
+                # 开启消息监听
+                await self._get_recv(_w, subscribe)
         except BaseException as err:
-            await asyncio.sleep(2)
-            print('网络问题,', subscribe, '重启')
-            asyncio.run_coroutine_threadsafe(
-                self.run_private(subscribe, url, new_loop, heart_loop),
-                new_loop)
+            print('出现问题,', subscribe, '重启', str(err))
+            await self._restart_link(websocket, subscribe, loop)
 
     # 启动公有链接
-    async def run_public(self, subscribe, url, new_loop, heart_loop):
+    async def run_public(self, subscribe, url, loop):
+
         try:
-            # 注册公共socket
+            websocket = None
+            # 开启socket
             async with websockets.connect(url) as _w:
+                # 发起订阅请求
+                websocket = _w
                 await self.subscribe_DICT[subscribe](_w)
-                # 配置心跳函数
-                threading.Timer(20, self.set_hearting,
-                                (_w, heart_loop, subscribe)).start()
-                await self._get_recv(_w, subscribe, new_loop)
+                # 注册心跳表 (websocket,频道名,事件循环对象,状态)
+                self.threadLock.acquire()
+                self.subscribe_INFO[subscribe] = [_w, subscribe, loop, 'start']
+                self.threadLock.release()
+                # 开启消息监听
+                await self._get_recv(_w, subscribe)
         except BaseException as err:
-            await asyncio.sleep(2)
-            print('网络问题,', subscribe, '重启')
-            asyncio.run_coroutine_threadsafe(
-                self.run_public(subscribe, url, new_loop, heart_loop),
-                new_loop)
-
-    # 心跳函数
-    def set_hearting(self, _w, loop, subscribe):
-        # 如果 链接打开着
-        if _w.state.name == "OPEN":
-            # 在心跳线程中塞入一个ping事件
-            asyncio.run_coroutine_threadsafe(self._do_send(_w, 'ping'),
-                                             loop).result()
-            # # 五秒后在执行一遍我自己
-            threading.Timer(20, self.set_hearting,
-                            (_w, loop, subscribe)).start()
-
-    # 归属私有频道还是公有频道
-    def is_public(self, _s):
-        return _s in self.subscribe['public']
+            print('出现问题,', subscribe, '重启', str(err))
+            await self._restart_link(websocket, subscribe, loop)
 
     # 获得一个在新线程里物阻塞的异步对象
     def _get_thred_loop(self, name):
@@ -129,8 +162,13 @@ class SocketApi:
         # 在一个新线程中启动loop
         def new_threading(new_loop):
             def _start_loop(loop):
-                asyncio.set_event_loop(loop)
-                loop.run_forever()
+                try:
+                    asyncio.set_event_loop(loop)
+                    loop.run_forever()
+                except:
+                    print('loop错误')
+                finally:
+                    loop.close()
 
             t = threading.Thread(target=_start_loop,
                                  name=name + "Thread",
@@ -142,10 +180,8 @@ class SocketApi:
         return new_loop
 
     # 接收工具
-    async def _get_recv(self, _w, subscribe, loop):
-        global timer
-        timer = None
-        while True:
+    async def _get_recv(self, _w, subscribe):
+        while subscribe in self.subscribe_INFO:
             recv_text = await _w.recv()
             # 消息处理阶段
             if recv_text != 'pong':
@@ -155,35 +191,35 @@ class SocketApi:
                         print(
                             '订阅',
                             recv_text['msg'] + '失败，错误码为：' + recv_text['code'])
-                        self._restart_link, (_w, subscribe, loop)
                     else:
                         print('订阅', recv_text['arg']['channel'], '成功')
                 else:
                     # print('连接中', len(threading.enumerate()), subscribe)
                     self.on_handle_message(recv_text)
-            # else:
-            # print(recv_text + subscribe)
+            else:
+                # 进程锁 更新频道信息
+                self.threadLock.acquire()
+                self.subscribe_INFO[subscribe][3] = recv_text
+                self.threadLock.release()
 
     # 需要重启响应函数
-    def _restart_link(self, _w, subscribe, loop):
-        print('进入重启程序---关闭连接与loop')
-
-        def _close(_websocket, _loop):
-            # 关闭 websocket
-            # 停下 loop循环 run_coroutine_threadsafe
-            asyncio.run_coroutine_threadsafe(_websocket.close(),
-                                             _loop).result()
-            _loop.call_soon_threadsafe(_loop.stop)
-            while True:
-                if _loop.is_running() == False:
-                    _loop.close()
-                    if _loop.is_closed() == True:
+    async def _restart_link(self, _websocket, subscribe, loop):
+        print('进入重启程序---关闭连接与loop,' + subscribe)
+        try:
+            # 关闭 websocket 停下 loop循环 run_coroutine_threadsafe
+            if _websocket and not _websocket.closed:
+                asyncio.run_coroutine_threadsafe(_websocket.close(),
+                                                 loop).result()
+            if loop.is_closed() != True:
+                loop.call_soon_threadsafe(loop.stop)
+                while True:
+                    if loop.is_closed() == True:
                         break
-
-        # 关闭连接并清理对应连接对象与loop对象的变量
-        _close(_w, loop)
-        params = {'type': 'restart', "data": subscribe}
-        self.on_handle_message(params)
+            # 编辑返回参数
+            params = {'type': 'restart', "data": subscribe}
+            self.on_handle_error(params)
+        except BaseException as err:
+            print('重启程序出现问题')
 
     # 频道区
     # 订阅 登录

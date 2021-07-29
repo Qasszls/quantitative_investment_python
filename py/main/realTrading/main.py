@@ -10,8 +10,7 @@ import time
 import asyncio
 import re
 import json
-from pymysql import NULL
-from requests.api import request
+import gc
 
 from tqdm import tqdm
 
@@ -32,7 +31,7 @@ class Trading:
                  stopLoss,
                  mode=None,
                  odds=0.05,
-                 lever=3,
+                 lever=5,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
@@ -41,17 +40,19 @@ class Trading:
         self.table_name = user_info['table_name']
 
         self.simpleMacd = SimpleMacd(mode, odds)
-        self.socket = SocketApi(callback=self._router,
+        self.socket = SocketApi(on_message=self._router,
+                                on_error=self.restart,
                                 user_info=user_info)  # 初始化长连接
         self.http = HttpApi(user_info=user_info)  # 初始化短连接
-        self.timeTamp = TimeTamp()
-        self.sqlHandler = SqlHandler(
+        self.timeTamp = TimeTamp()  # 初始化时间操作对象
+        self.sqlHandler = SqlHandler(  # 初始化数据库操作对象
             ip='127.0.0.1',
             userName='root',
             userPass='qass-utf-8',
             DBName='BTC-USDT_kline',
             charset='utf8',
         )
+
         self.checkSurplus = checkSurplus  # 玩家止盈率
         self.stopLoss = stopLoss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
@@ -67,9 +68,9 @@ class Trading:
         # self.ema26 = 29671.5
         # self.dea = -15.1924
         # 15m
-        self.ema12 = 37124.7
-        self.ema26 = 37112.6
-        self.dea = 17.1
+        self.ema12 = 39757.7
+        self.ema26 = 39777.0
+        self.dea = -15.1
         self.old_kl = []
         # 对照字典表
         self.channel_Dict = {
@@ -77,7 +78,6 @@ class Trading:
             'positions': self.update_position,  # 走 同上的函数
             "candle": self.breathing,  # 走 行情检测 函数
             'account': self.update_user,  #走 更新用户信息 函数
-            'restart': self.restart
         }
 
         self.btc_shangzuoliu_001 = {
@@ -112,22 +112,19 @@ class Trading:
                 print('调用错误')
                 return False
 
-        # 自定义回调数据
-        if 'type' in res:
-            _fun = query(res['type'])
-            _fun(res['data'])
+    # okex 回调数据
+
+        channel = res['arg']['channel']
+        # 如果回调数据 data长度为0，说明暂无数据，调用无效
+        if len(res['data']) == 0:
+            return
         else:
-            # okex 回调数据
-            channel = res['arg']['channel']
-            # 如果回调数据 data长度为0，说明暂无数据，调用无效
-            if len(res['data']) == 0:
-                return
-            else:
-                data = res['data'][0]
-                _fun = query(channel)
-                _fun(data)
+            data = res['data'][0]
+            _fun = query(channel)
+            _fun(data)
 
     # 主函数
+
     def _init(self):
         self._set_lever()
         #配置私有公有链接的频道
@@ -138,9 +135,9 @@ class Trading:
         for item in _pri:
             self.socket.run(private_subscribe=item)
 
-        # while True:
-        #     time.sleep(5)
-        #     print('\n 子线程', len(threading.enumerate()))
+        while True:
+            time.sleep(900)
+            self.get_systm_status()
 
     # 更新持仓数据
     def update_position(self, data):
@@ -169,57 +166,35 @@ class Trading:
         self._c = _get_usdt(_detail)  # 更新用户的USDT的币种余额
 
     # 重启策略
-    def restart(self, subscribe):
-        def _restart(_s):
-            if self.is_public(_s):
-                print('重启公有星球')
-                self.socket.run(public_subscribe=_s)
-            else:
-                print('重启私有星球')
-                self.socket.run(private_subscribe=_s)
-
-        print('星球重启---开启新的征程, 子线程', len(threading.enumerate()))
-        _ures, error = self.http.get_update_status()
-        if not error and len(_ures) > 0:
-            _udate_start = None
-            _udate_end = None
-            for item in _ures:
-                if item['state'] == 'ongoing':
-                    _udate_start = _ures['start']  # 服务器更新完成时间
-                    _udate_end = _ures['end']  # 服务器更新完成时间
-                    print(_ures, '服务器返回数据', '更新开始时间: ',
-                          self.timeTamp.get_time_normal(_udate_start),
-                          '更新结束时间: ',
-                          self.timeTamp.get_time_normal(_udate_end))
-                    # 服务器正在更新
-                    print(_ures, '更新中，谨慎恢复')
-                    return
-            _restart(subscribe)
-
-        elif error:
-            # 网络问题 轮询请求接口，等待网络恢复
-            time.sleep(10)
-            self.restart(subscribe)
+    def restart(self, _res):
+        subscribe = _res['data']
+        if self.is_public(subscribe):
+            print('重启公有星球')
+            self.socket.run(public_subscribe=subscribe)
         else:
-            _restart(subscribe)
+            print('重启私有星球')
+            self.socket.run(private_subscribe=subscribe)
 
-        # 是服务器的原因 还是 网络的原因
-        # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
-        # 否则如果是私有频道，直接恢复
-        # 不然就执行谨慎的恢复方法
-        # 谨慎的恢复方法为
-        # 材料： 链接中断时的时间戳
-        # 准备1： 根据【链接中断时的时间戳】推断出 链接中断的时间节点
-        # 准备2： 传送【链接中断的时间节点】给服务器，获取目前时间到 该时间节点的所有k线数据
-        # 准备3： 根据k线数据计算每一节点的【量化数据（list）】
-        # 阶段： 在谨慎的恢复方法执行之前
-        # 1.判断主线程与当前服务器时间间隔N（秒），N小于等于30秒的，仍认为当前数据连接中断状态
-        # 2.使用time.sleep方法模拟中断时间，入参为N。
-        # 阶段： 在谨慎的恢复方法执行之中
-        # 1.N秒后遍历【量化数据（list）】并调用breathing方法进行计算与数据落库的工作（争议：在此期间买点、卖点被激活怎么办？）
-        # 2.调用 socket.run 方法重启被中断的链接
+        print('星球重启---开启新的征程', gc.collect())
+
+    # 是服务器的原因 还是 网络的原因
+    # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
+    # 否则如果是私有频道，直接恢复
+    # 不然就执行谨慎的恢复方法
+    # 谨慎的恢复方法为
+    # 材料： 链接中断时的时间戳
+    # 准备1： 根据【链接中断时的时间戳】推断出 链接中断的时间节点
+    # 准备2： 传送【链接中断的时间节点】给服务器，获取目前时间到 该时间节点的所有k线数据
+    # 准备3： 根据k线数据计算每一节点的【量化数据（list）】
+    # 阶段： 在谨慎的恢复方法执行之前
+    # 1.判断主线程与当前服务器时间间隔N（秒），N小于等于30秒的，仍认为当前数据连接中断状态
+    # 2.使用time.sleep方法模拟中断时间，入参为N。
+    # 阶段： 在谨慎的恢复方法执行之中
+    # 1.N秒后遍历【量化数据（list）】并调用breathing方法进行计算与数据落库的工作（争议：在此期间买点、卖点被激活怎么办？）
+    # 2.调用 socket.run 方法重启被中断的链接
 
     # 策略核心内容
+
     def breathing(self, kline_data):
         # 判断新老数据
         # 第一次进入循环 或者 同一时间的老数据，都会进入
@@ -264,7 +239,7 @@ class Trading:
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
 
-        if medium_status and self.buy_times <= 3:
+        if medium_status and self.buy_times <= 2:
             #买入 钩子
             self.allBuy()
 
@@ -397,6 +372,26 @@ class Trading:
                 print('写入交易点失败code=', is_buy_set)
         except:
             print("Error: 请处理", self.timeTamp.get_time_normal(_now_tamp))
+
+    # 获取服务器更新节点
+    def get_systm_status(self):
+        _ures, error = self.http.get_update_status()
+        if not error and len(_ures) > 0:
+            for item in _ures:
+                if item['state'] == 'ongoing':
+                    _udate_start = _ures['start']  # 服务器更新完成时间
+                    _udate_end = _ures['end']  # 服务器更新完成时间
+                    print(_ures, '服务器返回数据', '更新开始时间: ',
+                          self.timeTamp.get_time_normal(_udate_start),
+                          '更新结束时间: ',
+                          self.timeTamp.get_time_normal(_udate_end))
+                    # 服务器正在更新
+                    print(_ures, '更新中，谨慎恢复')
+                    return
+        elif error:
+            # 网络问题 轮询请求接口，等待网络恢复
+            time.sleep(20)
+            self.get_systm_status()
 
     def _befor_investment(self, kline_data):
         # 私有函数
