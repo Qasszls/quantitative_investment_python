@@ -31,7 +31,6 @@ class Trading:
             print('请填写用户信息')
             return
 
-
         self.simpleMacd = SimpleMacd(mode, odds)
         self.socket = SocketApi(on_message=self._router,
                                 on_error=self.restart,
@@ -54,9 +53,9 @@ class Trading:
         # self.ema26 = 29671.5
         # self.dea = -15.1924
         # 15m
-        self.ema12 = 39707.8
-        self.ema26 = 39736.5
-        self.dea = -31.5827
+        self.ema12 = 39641.2
+        self.ema26 = 39730.0
+        self.dea = -81.2750
         self.old_kl = []
         # 对照字典表
         self.channel_Dict = {
@@ -123,7 +122,7 @@ class Trading:
 
         while True:
             self.get_systm_status()
-            time.sleep(1800)
+            time.sleep(3600)
 
     # 更新持仓数据
     def update_position(self, data):
@@ -161,7 +160,7 @@ class Trading:
             self.socket.run(public_subscribe=subscribe)
         else:
             self.dingding_msg('重启私有星球')
-            time.sleeo(5)
+            time.sleep(5)
             self.socket.run(private_subscribe=subscribe)
 
     # 是服务器的原因 还是 网络的原因
@@ -185,7 +184,6 @@ class Trading:
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
         text = text + ' :525'
-        print(text, flag)
         ding.send_text(msg=text, is_at_all=flag)
 
     def breathing(self, kline_data):
@@ -206,7 +204,6 @@ class Trading:
                 'id_tamp', 'open_price', 'high_price', 'lowest_price',
                 'close_price', 'vol', 'volCcy'
             ]
-
             KLINE_DATA = _k.to_dict('records')[0]
             # 准备数据-macd
             MACD_DATA = self._befor_investment(KLINE_DATA)
@@ -232,6 +229,8 @@ class Trading:
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
 
+        self.dingding_msg('时间：' + self.timeTamp.get_time_normal(id_tamp) +
+                          '已完成，步骤：' + _step)
         if medium_status and self.buy_times <= 2:
             #买入 钩子
             self.allBuy()

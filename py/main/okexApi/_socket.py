@@ -128,7 +128,7 @@ class SocketApi:
                 # 开启消息监听
                 await self._get_recv(_w, subscribe)
         except BaseException as err:
-            self.dingding_msg(subscribe + '出现问题,进行重启。', str(err))
+            self.dingding_msg(subscribe + '出现问题,进行重启。' + str(err))
             # print('出现问题,', subscribe, '重启', str(err))
             await self._restart_link(websocket, subscribe, loop)
 
@@ -149,16 +149,16 @@ class SocketApi:
                 # 开启消息监听
                 await self._get_recv(_w, subscribe)
         except BaseException as err:
-            self.dingding_msg(subscribe + '出现问题,进行重启。', str(err))
+            self.dingding_msg(subscribe + '出现问题,进行重启。' + str(err))
             # print('出现问题,', subscribe, '重启', str(err))
             await self._restart_link(websocket, subscribe, loop)
 
     # 钉钉消息助手
-    def dingding_msg(self, text):
+    def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
         text = text + ' :525'
-        ding.send_text(msg=text, is_at_all=False)
+        ding.send_text(msg=text, is_at_all=flag)
 
     # 获得一个在新线程里物阻塞的异步对象
     def _get_thred_loop(self, name):
