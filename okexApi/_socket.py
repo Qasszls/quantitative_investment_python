@@ -78,7 +78,7 @@ class SocketApi:
     async def set_hearting(self):
         # 如果 链接打开着
         while True:
-            time.sleep(25)
+            time.sleep(15)
             gc.collect()
             self.threadLock.acquire()
             dict = self.subscribe_INFO.copy()
@@ -101,6 +101,7 @@ class SocketApi:
                                 await self._restart_link(_w, subscribe, loop)
                         else:
                             if status == 'done':
+                                self.subscribe_INFO.pop(subscribe)
                                 await self._restart_link(_w, subscribe, loop)
 
             except BaseException as err:
@@ -222,18 +223,19 @@ class SocketApi:
         print('进入重启程序---关闭连接与loop,' + subscribe)
         try:
             # 关闭 websocket 停下 loop循环 run_coroutine_threadsafe
-            if _websocket and not _websocket.closed:
+            if _websocket and _websocket.state.name == 'OPEN' and not _websocket.closed:
                 asyncio.run_coroutine_threadsafe(_websocket.close(),
                                                  loop).result()
             # 停止task任务
+            print('socket 状态', _websocket.state.name)
             self.task_dict[subscribe].cancel()
-
             if loop.is_closed() != True:
                 loop.call_soon_threadsafe(loop.stop)
                 while True:
                     if loop.is_closed() == True:
                         break
             # 编辑返回参数
+            print('loop is closed', loop)
             params = {'type': 'restart', "data": subscribe}
             self.on_handle_error(params)
         except BaseException as err:
