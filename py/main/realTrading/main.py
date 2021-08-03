@@ -48,14 +48,10 @@ class Trading:
 
         # 内部变量
         self.buy_times = 0
-        # 1m
-        # self.ema12 = 29656.0
-        # self.ema26 = 29671.5
-        # self.dea = -15.1924
         # 15m
-        self.ema12 = 39641.2
-        self.ema26 = 39730.0
-        self.dea = -81.2750
+        self.ema12 = float(user_info['ema12'])
+        self.ema26 = float(user_info['ema26'])
+        self.dea = float(user_info['dea'])
         self.old_kl = []
         # 对照字典表
         self.channel_Dict = {
@@ -117,10 +113,11 @@ class Trading:
         _pub = self.btc_shangzuoliu_001['subscribe']['public']
         for item in _pub:
             self.socket.run(public_subscribe=item)
-        for item in _pri:
-            self.socket.run(private_subscribe=item)
+        # for item in _pri:
+        #     self.socket.run(private_subscribe=item)
 
         while True:
+            print('服务器状态轮询已开启')
             self.get_systm_status()
             time.sleep(3600)
 
@@ -153,6 +150,7 @@ class Trading:
 
     # 重启策略
     def restart(self, _res):
+        print('新家园建立', _res)
         subscribe = _res['data']
         if self.is_public(subscribe):
             self.dingding_msg('重启公有星球')
@@ -228,16 +226,19 @@ class Trading:
         macd_data = res['macd_data']  # macd数据包
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
-
         self.dingding_msg('时间：' + self.timeTamp.get_time_normal(id_tamp) +
-                          '已完成，步骤：' + _step)
+                          '已完成，步骤：' + str(_step))
         if medium_status and self.buy_times <= 2:
             #买入 钩子
             self.allBuy()
 
     # 下单
     def allBuy(self):
-        result = self._get_trad_sz()
+        try:
+            result = self._get_trad_sz()
+        except BaseException as err:
+            self.dingding_msg('获得计价货币函数出现问题, 重启函数' + str(err))
+            print('获得计价货币函数出现问题, 重启函数' + str(err))
         action = 'buy'
         availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
         # 获取变量
@@ -288,15 +289,16 @@ class Trading:
         if not error and len(_ures) > 0:
             for item in _ures:
                 if item['state'] == 'ongoing':
-                    _udate_start = _ures['start']  # 服务器更新完成时间
-                    _udate_end = _ures['end']  # 服务器更新完成时间
                     self.dingding_msg(
-                        _ures, '服务器返回数据', '更新开始时间: ',
-                        self.timeTamp.get_time_normal(_udate_start),
-                        '更新结束时间: ', self.timeTamp.get_time_normal(_udate_end))
+                        '服务器正在更新中,更新开始时间: ' +
+                        self.timeTamp.get_time_normal(_ures['start']) +
+                        '; 更新结束时间: ' +
+                        self.timeTamp.get_time_normal(_ures['end']))
                     # 服务器正在更新
                     print(_ures, '更新中，谨慎恢复')
                     return
+                # elif item['state'] == 'scheduled':
+
         elif error:
             # 网络问题 轮询请求接口，等待网络恢复
             print('get_systm_status 出现问题')
@@ -348,12 +350,14 @@ class Trading:
 # 工具查询---buy/sell阶段-数量
 
     def _set_lever(self):
+        print('杠杆配置中')
         #设置杠杆倍数 交易前配置
         instId = self.btc_shangzuoliu_001['instId']
         lever = self.btc_shangzuoliu_001['lever']
         mgnMode = self.btc_shangzuoliu_001['mgnMode']
         _s_p = {'instId': instId, 'lever': lever, 'mgnMode': mgnMode}
         self.http.set_account_set_leverage(_s_p)
+        print('杠杆配置完毕')
 
     def _get_trad_sz(self):
         instId = self.btc_shangzuoliu_001['instId']
@@ -401,5 +405,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.12, 0.06, user_info=_ulist, mode='loose')
+    trading = Trading(0.08, 0.06, user_info=_ulist, mode='loose')
     trading._init()
