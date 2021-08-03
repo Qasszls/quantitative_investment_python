@@ -38,6 +38,7 @@ class SocketApi:
         self.timeTamp = TimeTamp()
         # 注册本---心跳函数
         self.subscribe_INFO = {}
+        self.task_dict = {}
         # 各频道send方法
         self.subscribe_DICT = {
             'positions': self._positions,
@@ -58,18 +59,20 @@ class SocketApi:
             new_loop = self._get_thred_loop('---public---' + public_subscribe +
                                             '---')
             # 扔到对应线程异步里去
-            asyncio.run_coroutine_threadsafe(
-                self.run_public(public_subscribe, public_url, new_loop),
-                new_loop)
+            self.task_dict[
+                public_subscribe] = asyncio.run_coroutine_threadsafe(
+                    self.run_public(public_subscribe, public_url, new_loop),
+                    new_loop)
 
         if private_subscribe:
             # 获取一个跑起异步协程的子线程
             new_loop = self._get_thred_loop('---private---' +
                                             private_subscribe + '---')
             # 扔到对应线程异步里去
-            asyncio.run_coroutine_threadsafe(
-                self.run_private(private_subscribe, private_url, new_loop),
-                new_loop)
+            self.task_dict[
+                private_subscribe] = asyncio.run_coroutine_threadsafe(
+                    self.run_private(private_subscribe, private_url, new_loop),
+                    new_loop)
 
         # 心跳函数
     async def set_hearting(self):
@@ -95,7 +98,9 @@ class SocketApi:
                                 await self._do_send(_w, 'ping')
                             elif status == None:  # 进入重启流程
                                 self.subscribe_INFO.pop(subscribe)
-                                await asyncio.sleep(1)
+                                await self._restart_link(_w, subscribe, loop)
+                        else:
+                            if status == 'done':
                                 await self._restart_link(_w, subscribe, loop)
 
             except BaseException as err:
@@ -109,10 +114,8 @@ class SocketApi:
     async def run_private(self, subscribe, url, loop):
 
         try:
-            websocket = None
             async with websockets.connect(url) as _w:
                 # 登录账户
-                websocket = _w
                 status = await self.login(_w)
                 if not status:
                     print('登录失败')
@@ -129,18 +132,17 @@ class SocketApi:
                 await self._get_recv(_w, subscribe)
         except BaseException as err:
             self.dingding_msg(subscribe + '出现问题,进行重启。' + str(err))
-            # print('出现问题,', subscribe, '重启', str(err))
-            await self._restart_link(websocket, subscribe, loop)
+            print('出现问题,', subscribe, '重启', str(err))
+        finally:
+            self.subscribe_INFO[subscribe] = [_w, subscribe, loop, 'done']
 
     # 启动公有链接
     async def run_public(self, subscribe, url, loop):
 
         try:
-            websocket = None
             # 开启socket
             async with websockets.connect(url) as _w:
                 # 发起订阅请求
-                websocket = _w
                 await self.subscribe_DICT[subscribe](_w)
                 # 注册心跳表 (websocket,频道名,事件循环对象,状态)
                 self.threadLock.acquire()
@@ -150,8 +152,9 @@ class SocketApi:
                 await self._get_recv(_w, subscribe)
         except BaseException as err:
             self.dingding_msg(subscribe + '出现问题,进行重启。' + str(err))
-            # print('出现问题,', subscribe, '重启', str(err))
-            await self._restart_link(websocket, subscribe, loop)
+            print('出现问题,', subscribe, '重启', str(err))
+        finally:
+            self.subscribe_INFO[subscribe] = [_w, subscribe, loop, 'done']
 
     # 钉钉消息助手
     def dingding_msg(self, text, flag=False):
@@ -206,7 +209,7 @@ class SocketApi:
                                           '成功')
                         # print('订阅', recv_text['arg']['channel'], '成功')
                 else:
-                    # print('连接中', len(threading.enumerate()), subscribe)
+                    # print('连接中', recv_text, subscribe)
                     self.on_handle_message(recv_text)
             else:
                 # 进程锁 更新频道信息
@@ -222,6 +225,9 @@ class SocketApi:
             if _websocket and not _websocket.closed:
                 asyncio.run_coroutine_threadsafe(_websocket.close(),
                                                  loop).result()
+            # 停止task任务
+            self.task_dict[subscribe].cancel()
+
             if loop.is_closed() != True:
                 loop.call_soon_threadsafe(loop.stop)
                 while True:

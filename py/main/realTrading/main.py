@@ -41,6 +41,7 @@ class Trading:
         self.checkSurplus = checkSurplus  # 玩家止盈率
         self.stopLoss = stopLoss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
+        self.update_times = 0
         # self.upl = ''  # 未实现收益
         # self.uplRatio = ''  # 未实现收益率
         #用户层面
@@ -113,8 +114,8 @@ class Trading:
         _pub = self.btc_shangzuoliu_001['subscribe']['public']
         for item in _pub:
             self.socket.run(public_subscribe=item)
-        # for item in _pri:
-        #     self.socket.run(private_subscribe=item)
+        for item in _pri:
+            self.socket.run(private_subscribe=item)
 
         while True:
             print('服务器状态轮询已开启')
@@ -150,6 +151,12 @@ class Trading:
 
     # 重启策略
     def restart(self, _res):
+        if self.update_times > 0:
+            _ntamp = time.time() * 1000
+            print('当前时间',
+                  time.time() * 1000, '未来时间', _ntamp, '睡眠',
+                  (self.update_times - _ntamp) / 1000, '秒')
+            time.sleep(self.update_times - _ntamp)
         print('新家园建立', _res)
         subscribe = _res['data']
         if self.is_public(subscribe):
@@ -287,18 +294,33 @@ class Trading:
     def get_systm_status(self):
         _ures, error = self.http.get_update_status()
         if not error and len(_ures) > 0:
+            _utimes = 0
             for item in _ures:
                 if item['state'] == 'ongoing':
                     self.dingding_msg(
                         '服务器正在更新中,更新开始时间: ' +
-                        self.timeTamp.get_time_normal(_ures['start']) +
+                        self.timeTamp.get_time_normal(item['begin']) +
                         '; 更新结束时间: ' +
-                        self.timeTamp.get_time_normal(_ures['end']))
+                        self.timeTamp.get_time_normal(item['end']))
+                    print('服务器正在更新中,更新开始时间: ' +
+                          self.timeTamp.get_time_normal(item['begin']) +
+                          '; 更新结束时间: ' +
+                          self.timeTamp.get_time_normal(item['end']))
+                    # 找出最长更新时间段
+                    if _utimes < int(item['end']):
+                        _utimes = int(item['end'])
                     # 服务器正在更新
-                    print(_ures, '更新中，谨慎恢复')
-                    return
-                # elif item['state'] == 'scheduled':
-
+                elif item['state'] == 'scheduled':
+                    self.dingding_msg(
+                        '服务器有更新计划,更新开始时间: ' +
+                        self.timeTamp.get_time_normal(item['begin']) +
+                        '; 更新结束时间: ' +
+                        self.timeTamp.get_time_normal(item['end']))
+                    print('服务器有更新计划,更新开始时间: ' +
+                          self.timeTamp.get_time_normal(item['begin']) +
+                          '; 更新结束时间: ' +
+                          self.timeTamp.get_time_normal(item['end']))
+            self.update_times = _utimes
         elif error:
             # 网络问题 轮询请求接口，等待网络恢复
             print('get_systm_status 出现问题')
@@ -403,7 +425,7 @@ if __name__ == "__main__":
     # macd 底背离
     f = open('../config.json', 'r', encoding='utf-8')
     _data = json.load(f)
-    _ulist = _data['realPay']
+    _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.08, 0.06, user_info=_ulist, mode='loose')
+    trading = Trading(0.03, 0.05, user_info=_ulist, mode='loose')
     trading._init()

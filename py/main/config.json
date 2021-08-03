@@ -125,11 +125,14 @@
         "access_key" :"1b8a5361-5ca4-46f9-bc44-e8ca92f5b5be",
         "secret_key" :"B993AADED4E2FAB374DED76C7BF1509B",
         "passphrase" :"ZLS2548120547",
-        "table_name":"realPay_1m",
+        "table_name":"realPay_15m",
         "name":"realPay",
         "note":"主账户",
-        "market_lv":"candle1m",
+        "market_lv":"candle15m",
         "trading_type":"1", 
+        "ema12":"39177.1",
+        "ema26":"39166.2",
+        "dea":"-85.555",
         "subscribe": {
           "private":["positions","account"],
           "public":["market"]
@@ -140,11 +143,14 @@
             "access_key" :"cba5d8fc-d233-498c-b18b-5c4f1942eb90",
             "secret_key" :"7DF96F09287EF80869E85C964935E14A",
             "passphrase" :"Zls2548120547",
-            "table_name":"realPay_qassChildrenTwo_1m",
+            "table_name":"realPay_qassChildrenTwo_15m",
             "name":"qassChildrenTwo",
+            "ema12":"39177.1",
+            "ema26":"39166.2",
+            "dea":"-85.555",
             "note":"子账户，用来交易MACD底背离交易策略",
             "trading_type":"1",
-            "market_lv":"candle1m",
+            "market_lv":"candle15m",
             "subscribe": {
               "private":["positions","account"],
               "public":["market"]
