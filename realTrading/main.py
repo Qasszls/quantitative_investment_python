@@ -108,6 +108,7 @@ class Trading:
     # 主函数
 
     def _init(self):
+        # 配置杠杆
         self._set_lever()
         #配置私有公有链接的频道
         _pri = self.btc_shangzuoliu_001['subscribe']['private']
@@ -212,6 +213,7 @@ class Trading:
             KLINE_DATA = _k.to_dict('records')[0]
             # 准备数据-macd
             MACD_DATA = self._befor_investment(KLINE_DATA)
+            self.old_kl = kline_data
             # 运行策略 *********** door **************
             self.simpleMacd.runStrategy(
                 KLINE_DATA,
@@ -219,7 +221,6 @@ class Trading:
                 self.onCalculate,
                 self.completed,
             )
-            self.old_kl = kline_data
 
     #钩子函数 计算中
     def onCalculate(self, res):
