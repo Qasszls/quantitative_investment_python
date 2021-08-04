@@ -154,19 +154,22 @@ class Trading:
     def restart(self, _res):
         if self.update_times > 0:
             _ntamp = time.time() * 1000
-            print('当前时间',
-                  time.time() * 1000, '未来时间', _ntamp, '睡眠',
+            print('当前时间')
+            print(time.time() * 1000, '未来时间', _ntamp, '睡眠',
                   (self.update_times - _ntamp) / 1000, '秒')
+            self.dingding_msg('当前时间' + str(time.time() * 1000) + '未来时间' +
+                              str(_ntamp) + '睡眠' +
+                              str((self.update_times - _ntamp) / 1000) + '秒')
             time.sleep(self.update_times - _ntamp)
-        print('新家园建立', _res)
+        print('新家园建立')
         subscribe = _res['data']
         if self.is_public(subscribe):
             self.dingding_msg('重启公有星球')
-            time.sleep(5)
+            time.sleep(3)
             self.socket.run(public_subscribe=subscribe)
         else:
             self.dingding_msg('重启私有星球')
-            time.sleep(5)
+            time.sleep(3)
             self.socket.run(private_subscribe=subscribe)
 
     # 是服务器的原因 还是 网络的原因
