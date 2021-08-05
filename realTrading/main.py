@@ -15,7 +15,8 @@ import gc
 sys.path.append('..')
 from util.TimeStamp import TimeTamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
-from okexApi._socket import SocketApi
+from okexApi._websocket import PublicSocketApi
+from okexApi._websocket import PrivateSocketApi
 from okexApi._http import HttpApi
 
 
@@ -32,9 +33,14 @@ class Trading:
             return
 
         self.simpleMacd = SimpleMacd(mode, odds)
-        self.socket = SocketApi(on_message=self._router,
-                                on_error=self.restart,
-                                user_info=user_info)  # 初始化长连接
+        self.publicSocketApi = PublicSocketApi(on_created=None,
+                                               on_message=self._router,
+                                               on_closed=self.restart,
+                                               user_info=user_info)  # 初始化长连接
+        self.privateSocketApi = PrivateSocketApi(on_created=None,
+                                                 on_message=self._router,
+                                                 on_closed=self.restart,
+                                                 user_info=user_info)  # 初始化长连接
         self.http = HttpApi(user_info=user_info)  # 初始化短连接
         self.timeTamp = TimeTamp()  # 初始化时间操作对象
 
@@ -111,12 +117,8 @@ class Trading:
         # 配置杠杆
         self._set_lever()
         #配置私有公有链接的频道
-        _pri = self.btc_shangzuoliu_001['subscribe']['private']
-        _pub = self.btc_shangzuoliu_001['subscribe']['public']
-        for item in _pub:
-            self.socket.run(public_subscribe=item)
-        for item in _pri:
-            self.socket.run(private_subscribe=item)
+        self.publicSocketApi.subscription()
+        self.privateSocketApi.subscription()
 
         while True:
             print('服务器状态轮询已开启')
@@ -126,13 +128,13 @@ class Trading:
     # 更新持仓数据
     def update_position(self, data):
         self.upl = float(data['upl'])
-        uplRatio = abs(float(data['uplRatio']))
+        uplRatio = float(data['uplRatio'])
 
         def _is_checkSurplus():
             return uplRatio >= self.checkSurplus
 
         def _is_sotpLoss():
-            return uplRatio >= self.stopLoss
+            return abs(uplRatio) >= self.stopLoss
 
         # 检测止盈止损
         if _is_checkSurplus() or _is_sotpLoss():
@@ -162,11 +164,12 @@ class Trading:
                               str((self.update_times - _ntamp) / 1000) + '秒')
             time.sleep(self.update_times - _ntamp)
         print('新家园建立')
-        subscribe = _res['data']
-        if self.is_public(subscribe):
+        name = _res['data']
+        if name == 'public':
             self.dingding_msg('重启公有星球')
             time.sleep(3)
-            self.socket.run(public_subscribe=subscribe)
+            self.publicSocketApi.subscription()
+
         else:
             self.dingding_msg('重启私有星球')
             time.sleep(3)

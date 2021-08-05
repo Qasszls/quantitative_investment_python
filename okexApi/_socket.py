@@ -113,8 +113,7 @@ class SocketApi:
                 # 登录账户
                 status = await self.login(_w)
                 if not status:
-                    print('登录失败')
-                    return
+                    raise Exception('登录失败')
                 # 发起订阅请求
                 await self.subscribe_DICT[subscribe](_w)
 
