@@ -80,7 +80,7 @@ class SocketApi:
             dict = self.subscribe_INFO.copy()
             try:
                 if dict and len(dict) > 0:
-                    print('进入了心跳函数', dict)
+                    # print('进入了心跳函数', dict)
                     for _k, _v in dict.items():
                         _w = _v['_w']
                         loop = _v['loop']
@@ -108,6 +108,7 @@ class SocketApi:
     # 启动私有链接
     async def run_private(self, subscribe, url, loop):
         try:
+            print('开启私有 socket')
             async with websockets.connect(url) as _w:
                 # 登录账户
                 status = await self.login(_w)
@@ -138,6 +139,7 @@ class SocketApi:
     async def run_public(self, subscribe, url, loop):
         try:
             # 开启socket
+            print('开启公有 socket')
             async with websockets.connect(url) as _w:
                 # 发起订阅请求
                 await self.subscribe_DICT[subscribe](_w)
@@ -190,7 +192,7 @@ class SocketApi:
     # 接收工具
     async def _get_recv(self, _w, subscribe):
         while True:
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
             recv_text = await _w.recv()
             # 消息处理阶段
             if recv_text != 'pong':
@@ -206,6 +208,9 @@ class SocketApi:
                                           '成功')
                         print('订阅', recv_text['arg']['channel'], '成功')
                 else:
+                    self.threadLock.acquire()
+                    self.subscribe_INFO[subscribe]['status'] = 'pong'
+                    self.threadLock.release()
                     # print('连接中', recv_text, subscribe)
                     self.on_handle_message(recv_text)
             else:
@@ -223,13 +228,16 @@ class SocketApi:
                 asyncio.run_coroutine_threadsafe(_websocket.close(),
                                                  loop).result()
             # 停止task任务
+            print('停止task任务')
             self.task_dict[subscribe].cancel()
             loop.call_soon_threadsafe(loop.stop)
 
             # 清理数据
+            print('清理数据')
             self.task_dict.pop(subscribe)
             self.subscribe_INFO.pop(subscribe)
             # 重启
+            print('重启')
             params = {'type': 'restart', "data": subscribe}
             self.on_handle_error(params)
 

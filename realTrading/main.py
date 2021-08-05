@@ -25,7 +25,7 @@ class Trading:
                  stopLoss,
                  mode=None,
                  odds=0.05,
-                 lever=2,
+                 lever=10,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
@@ -431,5 +431,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.03, 0.05, user_info=_ulist, mode='loose')
+    trading = Trading(0.12, 0.05, user_info=_ulist, mode='loose')
     trading._init()
