@@ -19,8 +19,6 @@ class BaseSocketApi:
     def __init__(self, name, url):
         self.timeTamp = TimeTamp()
         self._recv_pong = None
-        self._loop = None
-        self._websocket = None
         self._task = None
         self.name = name
         self.url = url
@@ -28,22 +26,21 @@ class BaseSocketApi:
     # 方法总入口
     def run(self, ON_CREATED, ON_MESSAGE, ON_CLOSED):
         # 获取一个跑起异步协程的子线程
-        self._loop = self._get_thred_loop('---' + self.name + '---')
+        ws_loop = self._get_thred_loop('---' + self.name + '---')
         # 扔到对应线程异步里去
         self._task = asyncio.run_coroutine_threadsafe(
-            self.link_websocket(ON_CREATED, ON_MESSAGE, ON_CLOSED), self._loop)
+            self.link_websocket(ws_loop, ON_CREATED, ON_MESSAGE, ON_CLOSED),
+            ws_loop)
 
     # 连接 websocket
-    async def link_websocket(self, ON_CREATED, ON_MESSAGE, ON_CLOSED):
+    async def link_websocket(self, ws_loop, ON_CREATED, ON_MESSAGE, ON_CLOSED):
         url = self.url
         name = self.name
         try:
-            print('开启 socket')
             async with websockets.connect(url) as websocket:
                 # do_something 订阅频道 设置心跳函数
                 await ON_CREATED(websocket)
-                self.run_hearting(websocket, ON_CLOSED)
-                self._websocket = websocket
+                self.run_hearting(websocket, ws_loop)
                 self._recv_pong = 'pong'
                 # 开启消息监听
                 await self._get_recv(websocket, ON_MESSAGE)
@@ -51,20 +48,20 @@ class BaseSocketApi:
             self.dingding_msg(name + '连接出现问题,进行重启。' + str(err))
             print('出现问题,', name, '重启', str(err))
         finally:
-            self._restart_link(ON_CLOSED)
+            self._restart_link(ws_loop, ON_CLOSED)
 
     # 启动heart函数总入口
-    def run_hearting(self, websocket, ON_CLOSED):
-        loop = self._get_thred_loop('    heart   ')
+    def run_hearting(self, websocket, ws_loop):
+        heart_loop = self._get_thred_loop('    heart   ')
         asyncio.run_coroutine_threadsafe(
-            self._set_hearting(websocket, loop, ON_CLOSED), loop)
+            self._set_hearting(websocket, heart_loop, ws_loop), heart_loop)
 
     # 设置心跳函数
-    async def _set_hearting(self, websocket, loop, ON_CLOSED):
+    async def _set_hearting(self, websocket, heart_loop, ws_loop):
         # 如果 链接打开着
         try:
             while True:
-                time.sleep(25)
+                time.sleep(20)
                 gc.collect()
                 if websocket.state.name == "OPEN":
                     if self._recv_pong == 'pong':
@@ -76,10 +73,13 @@ class BaseSocketApi:
                     raise Exception('websocket已关闭')
 
         except BaseException as err:
-            print('心跳函数发生错误', str(err))
+            print('心跳函数抛出异常', str(err))
         finally:
-            loop.call_soon_threadsafe(loop.stop)
-            self._restart_link(ON_CLOSED)
+            # 关闭 websocket 停下 loop循环 run_coroutine_threadsafe
+            if websocket and websocket.state.name == 'OPEN' and not websocket.closed:
+                asyncio.run_coroutine_threadsafe(websocket.close(),
+                                                 ws_loop).result()
+            heart_loop.call_soon_threadsafe(heart_loop.stop)
 
     # 接收工具
     async def _get_recv(self, websocket, ON_MESSAGE):
@@ -99,44 +99,35 @@ class BaseSocketApi:
                                           '成功')
                         print('订阅', recv_text['arg']['channel'], '成功')
                 else:
-                    print('连接中', recv_text)
+                    # print('连接中', recv_text)
                     ON_MESSAGE(recv_text)
             else:
                 # print('pong :', recv_text)
                 self._recv_pong = recv_text
 
     # 需要重启响应函数
-    def _restart_link(self, ON_CLOSED):
-        loop = self._loop
+    def _restart_link(self, ws_loop, ON_CLOSED):
         name = self.name
-        websocket = self._websocket
         print('进入重启程序---关闭连接与loop,' + name)
         try:
-            if not self._task.cancelled():
+            if self._task and not self._task.cancelled():
                 self._task.cancel()
-                # 关闭 websocket 停下 loop循环 run_coroutine_threadsafe
-                if websocket and websocket.state.name == 'OPEN' and not websocket.closed:
-                    asyncio.run_coroutine_threadsafe(websocket.close(),
-                                                     loop).result()
                 # 停止事件循环
                 print('停止事件循环')
-                if not loop.is_closed():
-                    loop.call_soon_threadsafe(loop.stop)
-                while True:
-                    if not loop.is_running():
-                        break
+                if not ws_loop.is_closed():
+                    ws_loop.call_soon_threadsafe(ws_loop.stop)
+
                 # 清理数据
                 print('清理数据')
-                self._recv_pong = None
-                self._loop = None
-                self._websocket = None
                 self._task = None
                 print('重启')
                 params = {'type': 'restart', "data": name}
                 ON_CLOSED(params)
+            else:
+                print('_task已关闭,不进行重启')
         except BaseException as err:
             self.dingding_msg('重启程序出现问题: ' + str(err))
-            print('重启程序出现问题')
+            print('重启程序出现问题' + str(err))
 
     # 钉钉消息助手
     def dingding_msg(self, text, flag=False):

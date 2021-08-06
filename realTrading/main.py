@@ -127,7 +127,7 @@ class Trading:
 
     # 更新持仓数据
     def update_position(self, data):
-        self.upl = float(data['upl'])
+        upl = float(data['upl'])
         uplRatio = float(data['uplRatio'])
 
         def _is_checkSurplus():
@@ -173,7 +173,7 @@ class Trading:
         else:
             self.dingding_msg('重启私有星球')
             time.sleep(3)
-            self.socket.run(private_subscribe=subscribe)
+            self.privateSocketApi.subscription()
 
     # 是服务器的原因 还是 网络的原因
     # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
