@@ -119,26 +119,27 @@ class Trading:
         #配置私有公有链接的频道
         self.publicSocketApi.subscription()
         self.privateSocketApi.subscription()
-
+        print('服务器状态轮询准备开启')
         while True:
-            print('服务器状态轮询已开启')
+            print('服务器状态轮询中……')
             self.get_systm_status()
             time.sleep(3600)
 
     # 更新持仓数据
     def update_position(self, data):
-        upl = float(data['upl'])
-        uplRatio = float(data['uplRatio'])
+        if data['upl'] != '':
+            upl = float(data['upl'])
+            uplRatio = float(data['uplRatio'])
 
-        def _is_checkSurplus():
-            return uplRatio >= self.checkSurplus
+            def _is_checkSurplus():
+                return uplRatio >= self.checkSurplus
 
-        def _is_sotpLoss():
-            return abs(uplRatio) >= self.stopLoss
+            def _is_sotpLoss():
+                return abs(uplRatio) >= self.stopLoss
 
-        # 检测止盈止损
-        if _is_checkSurplus() or _is_sotpLoss():
-            self.allSell()
+            # 检测止盈止损
+            if _is_checkSurplus() or _is_sotpLoss():
+                self.allSell()
 
     # 更新用户数据
     def update_user(self, data):
@@ -163,15 +164,13 @@ class Trading:
                               str(_ntamp) + '睡眠' +
                               str((self.update_times - _ntamp) / 1000) + '秒')
             time.sleep(self.update_times - _ntamp)
-        print('新家园建立')
         name = _res['data']
+        print(name + '新家园建立')
         if name == 'public':
-            self.dingding_msg('重启公有星球')
             time.sleep(3)
             self.publicSocketApi.subscription()
 
         else:
-            self.dingding_msg('重启私有星球')
             time.sleep(3)
             self.privateSocketApi.subscription()
 
@@ -195,7 +194,8 @@ class Trading:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        text = text + ' :525'
+        text = text + self.timeTamp.get_time_normal(
+            time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
     def breathing(self, kline_data):
@@ -278,7 +278,6 @@ class Trading:
             self.dingding_msg('买入成功' + str(res))
 
     def allSell(self):
-
         # 获取变量
         instId = self.btc_shangzuoliu_001['instId']
         mgnMode = self.btc_shangzuoliu_001['mgnMode']
@@ -331,6 +330,7 @@ class Trading:
         elif error:
             # 网络问题 轮询请求接口，等待网络恢复
             print('get_systm_status 出现问题')
+            time.sleep(3)
             self.get_systm_status()
         else:
             self.dingding_msg('策略运行中，服务器没有更新计划')

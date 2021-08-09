@@ -45,7 +45,7 @@ class BaseSocketApi:
                 # 开启消息监听
                 await self._get_recv(websocket, ON_MESSAGE)
         except BaseException as err:
-            self.dingding_msg(name + '连接出现问题,进行重启。' + str(err))
+            # self.dingding_msg(name + '连接出现问题,进行重启。' + str(err))
             print('出现问题,', name, '重启', str(err))
         finally:
             self._restart_link(ws_loop, ON_CLOSED)
@@ -97,7 +97,9 @@ class BaseSocketApi:
                     else:
                         self.dingding_msg('订阅' + recv_text['arg']['channel'] +
                                           '成功')
-                        print('订阅', recv_text['arg']['channel'], '成功')
+                        print(
+                            '订阅', recv_text['arg']['channel'], '成功',
+                            self.timeTamp.get_time_normal(time.time() * 1000))
                 else:
                     # print('连接中', recv_text)
                     ON_MESSAGE(recv_text)
@@ -108,19 +110,17 @@ class BaseSocketApi:
     # 需要重启响应函数
     def _restart_link(self, ws_loop, ON_CLOSED):
         name = self.name
-        print('进入重启程序---关闭连接与loop,' + name)
+        # print('进入重启程序---关闭连接与loop,' + name)
         try:
             if self._task and not self._task.cancelled():
                 self._task.cancel()
                 # 停止事件循环
-                print('停止事件循环')
                 if not ws_loop.is_closed():
                     ws_loop.call_soon_threadsafe(ws_loop.stop)
 
                 # 清理数据
-                print('清理数据')
                 self._task = None
-                print('重启')
+                # 重启
                 params = {'type': 'restart', "data": name}
                 ON_CLOSED(params)
             else:
@@ -133,7 +133,8 @@ class BaseSocketApi:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        text = text + ' :525'
+        text = text + self.timeTamp.get_time_normal(
+            time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
     # 获得一个在新线程里物阻塞的异步对象
@@ -163,14 +164,12 @@ class BaseSocketApi:
         new_threading(new_loop)  # 新起一个线程跑异步轮询
         return new_loop
 
-    # 基础工具函数
     # 订阅函数
     def _get_base(self, _w, op='subscribe', args=None):
         _a = []
         # 编辑args
         if isinstance(args, list):
             if len(args) == 0:
-                print('请输入订阅的频道')
                 return
             for item in args:
                 _a.append(item)
