@@ -47,6 +47,7 @@ class Trading:
         self.checkSurplus = checkSurplus  # 玩家止盈率
         self.stopLoss = stopLoss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
+        self.odds = odds  # 宽容度
         self.update_times = 0
         # self.upl = ''  # 未实现收益
         # self.uplRatio = ''  # 未实现收益率
@@ -68,9 +69,9 @@ class Trading:
             'account': self.update_user,  #走 更新用户信息 函数
         }
 
-        self.btc_shangzuoliu_001 = {
+        self.okex_api_info = {
             'instType': 'SPOT',  # 产品类型SPOT：币币、SWAP：永续合约、FUTURES：交割合约、OPTION：期权
-            'instId': 'BTC-USDT',  # 交易产品 后期可为数组
+            'instId': user_info['symbol'],  # 交易产品 后期可为数组
             'tdMode': 'cross',  # 交易模式
             # 杠杆部分
             'ccy': 'USDT',  # 保证金币种
@@ -86,7 +87,7 @@ class Trading:
 
     # 是否是公共频道
     def is_public(self, _s):
-        public_subscribe = self.btc_shangzuoliu_001['subscribe']['public']
+        public_subscribe = self.okex_api_info['subscribe']['public']
         return _s in public_subscribe
 
     # 推送路由
@@ -119,7 +120,9 @@ class Trading:
         #配置私有公有链接的频道
         self.publicSocketApi.subscription()
         self.privateSocketApi.subscription()
-        print('服务器状态轮询准备开启')
+        print('主程序已打开，用户止盈率为：' + str(self.checkSurplus * 100) + '%; 止损率为：' +
+              str(self.stopLoss * 100) + '%; 默认杠杆倍数为：' + str(self.lever) +
+              '倍;宽容度为：' + str(self.odds * 100) + '%')
         while True:
             print('服务器状态轮询中……')
             self.get_systm_status()
@@ -194,7 +197,7 @@ class Trading:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        text = text + self.timeTamp.get_time_normal(
+        text = text + '  ' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
@@ -256,10 +259,10 @@ class Trading:
         action = 'buy'
         availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
         # 获取变量
-        instId = self.btc_shangzuoliu_001['instId']
-        tdMode = self.btc_shangzuoliu_001['tdMode']
-        ordType = self.btc_shangzuoliu_001['ordType']
-        ccy = self.btc_shangzuoliu_001['ccy']
+        instId = self.okex_api_info['instId']
+        tdMode = self.okex_api_info['tdMode']
+        ordType = self.okex_api_info['ordType']
+        ccy = self.okex_api_info['ccy']
 
         # 配置策略内容
         params = {
@@ -279,9 +282,9 @@ class Trading:
 
     def allSell(self):
         # 获取变量
-        instId = self.btc_shangzuoliu_001['instId']
-        mgnMode = self.btc_shangzuoliu_001['mgnMode']
-        ccy = self.btc_shangzuoliu_001['ccy']
+        instId = self.okex_api_info['instId']
+        mgnMode = self.okex_api_info['mgnMode']
+        ccy = self.okex_api_info['ccy']
 
         # 配置策略内容
         params = {
@@ -381,19 +384,19 @@ class Trading:
     def _set_lever(self):
         print('杠杆配置中')
         #设置杠杆倍数 交易前配置
-        instId = self.btc_shangzuoliu_001['instId']
-        lever = self.btc_shangzuoliu_001['lever']
-        mgnMode = self.btc_shangzuoliu_001['mgnMode']
+        instId = self.okex_api_info['instId']
+        lever = self.okex_api_info['lever']
+        mgnMode = self.okex_api_info['mgnMode']
         _s_p = {'instId': instId, 'lever': lever, 'mgnMode': mgnMode}
         self.http.set_account_set_leverage(_s_p)
         print('杠杆配置完毕')
 
     def _get_trad_sz(self):
-        instId = self.btc_shangzuoliu_001['instId']
-        tdMode = self.btc_shangzuoliu_001['tdMode']
-        instType = self.btc_shangzuoliu_001['instType']
-        ccy = self.btc_shangzuoliu_001['ccy']
-        lever = self.btc_shangzuoliu_001['lever']
+        instId = self.okex_api_info['instId']
+        tdMode = self.okex_api_info['tdMode']
+        instType = self.okex_api_info['instType']
+        ccy = self.okex_api_info['ccy']
+        lever = self.okex_api_info['lever']
         _max_size_params = {
             'instId': instId,
             'tdMode': tdMode,
@@ -434,5 +437,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.12, 0.05, user_info=_ulist, mode='loose')
+    trading = Trading(0.16, 0.08, user_info=_ulist, mode='loose')
     trading._init()

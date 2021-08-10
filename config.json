@@ -1,125 +1,5 @@
 {
-    "task_library": [
-        {
-          "table": "2020_kline_1m",
-          "times": [1609430399000, 1577807999000],
-          "bar": "1",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2019_kline_1m",
-          "times": [1577807999000, 1546271999000],
-          "bar": "1",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2020_kline_3m",
-          "times": [1609430399000, 1577807999000],
-          "bar": "3",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2019_kline_3m",
-          "times": [1577807999000, 1546271999000],
-          "bar": "3",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2020_kline_5m",
-          "times": [1609430399000, 1577807999000],
-          "bar": "5",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2019_kline_5m",
-          "times": [1577807999000, 1546271999000],
-          "bar": "5",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2020_kline_15m",
-          "times": [1609430399000, 1577807999000],
-          "bar": "15",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2019_kline_15m",
-          "times": [1577807999000, 1546271999000],
-          "bar": "15",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2020_kline_30m",
-          "times": [1609430399000, 1577807999000],
-          "bar": "30",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        {
-          "table": "2019_kline_30m",
-          "times": [1577807999000, 1546271999000],
-          "bar": "30",
-          "_bar_unit": "m",
-          "limit": "100"
-        },
-        { 
-          "table": "2020_kline_1H",
-          "times": [1609430399000, 1577807999000], 
-          "bar": "1",
-          "_bar_unit": "H",
-          "limit": "100"
-        },
-        {
-          "table": "2019_kline_1H",
-          "times": [1577807999000, 1546271999000],
-          "bar": "1",
-          "_bar_unit": "H",
-          "limit": "100"
-        },
-        {
-          "table": "2020_kline_1D",
-          "times": [1609430399000, 1577807999000],
-          "bar": "1",
-          "_bar_unit": "D",
-          "limit": "100"
-        },
-        {
-          "table": "2019_kline_1D",
-          "times": [1577807999000, 1546271999000],
-          "bar": "1",
-          "_bar_unit": "D",
-          "limit": "100"
-        },
-        {
-          "table": "2020_kline_1W",
-          "times": [1609430399000, 1577807999000],
-          "bar": "1",
-          "_bar_unit": "W",
-          "limit": "1"
-        },
-        {
-          "table": "2019_kline_1W",
-          "times": [1577807999000, 1546271999000],
-          "bar": "1",
-          "_bar_unit": "W",
-          "limit": "1"
-        }
-    ],
-    "filter":["1D"],
-    "DBName":"BTC-USDT_kline",
-    "DINGTALK": "",
     "strategy_name": "double_ma_strategy",
-    "platform": "OKEX",
-    "symbol": "BTC-USDT",
-    "kline_interval": "1m",
     "realPay":{
         "host":"https://www.okex.com",
         "access_key" :"1b8a5361-5ca4-46f9-bc44-e8ca92f5b5be",
@@ -133,6 +13,7 @@
         "ema12":"39177.1",
         "ema26":"39166.2",
         "dea":"-85.555",
+        "symbol": "BTC-USDT",
         "subscribe": {
           "private":["positions","account"],
           "public":["market"]
@@ -145,9 +26,10 @@
             "passphrase" :"Zls2548120547",
             "table_name":"realPay_qassChildrenTwo_15m",
             "name":"qassChildrenTwo",
-            "ema12":"39420.3",
-            "ema26":"39460.5",
-            "dea":"-46.5908",
+            "ema12":"162.99",
+            "ema26":"163.41",
+            "dea":"-0.55",
+            "symbol": "LTC-USDT",
             "note":"子账户，用来交易MACD底背离交易策略",
             "trading_type":"1",
             "market_lv":"candle15m",

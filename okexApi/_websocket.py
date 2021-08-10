@@ -61,7 +61,7 @@ class BaseSocketApi:
         # 如果 链接打开着
         try:
             while True:
-                time.sleep(20)
+                time.sleep(25)
                 gc.collect()
                 if websocket.state.name == "OPEN":
                     if self._recv_pong == 'pong':
@@ -84,6 +84,7 @@ class BaseSocketApi:
     # 接收工具
     async def _get_recv(self, websocket, ON_MESSAGE):
         while True:
+            time.sleep(1)
             recv_text = await websocket.recv()
             # 消息处理阶段
             if recv_text != 'pong':
@@ -133,7 +134,7 @@ class BaseSocketApi:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        text = text + self.timeTamp.get_time_normal(
+        text = text + '  ' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
@@ -220,7 +221,7 @@ class PublicSocketApi(BaseSocketApi):
         self.on_closed(res)
 
     # 订阅行情频道
-    def _market(self, _w, channel='candle1m', symbol='BTC-USDT'):
+    def _market(self, _w, channel, symbol):
         return self._get_base(_w, args={"channel": channel, "instId": symbol})
 
 
