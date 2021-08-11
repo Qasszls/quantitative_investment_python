@@ -24,12 +24,12 @@ class Investment(threading.Thread):
                  stopLoss,
                  principal,
                  klineMediumLevel,
-                 medDF,
                  table_name,
                  mode,
                  odds,
                  _name,
                  leverage=1,
+                 user_info=None,
                  threadID=None):
         """
         初始化
@@ -41,9 +41,11 @@ class Investment(threading.Thread):
             购币痕迹 
         """
         threading.Thread.__init__(self)
+        if not user_info:
+            print('请填写用户信息')
+            return
         # 数据导入 - 大型数据包
         self.klineMediumLevel = klineMediumLevel  # 初级k线数据包
-        self.medDF = medDF  # 初级macd数据包
         # 入参赋值
         self.checkSurplus = float(checkSurplus)  # 止盈
         self.stopLoss = float(stopLoss)  # 止损
@@ -52,6 +54,7 @@ class Investment(threading.Thread):
         self.mode = mode  # 宽容模式
         self.odds = odds  # 宽容度
         self.name = _name  # 数据别名
+        self.user_info = user_info  # 用户信息
         #内部变量 - 买入时间
         self.buy_time = None
         # 内部变量 - 杠杆部分
@@ -85,11 +88,11 @@ class Investment(threading.Thread):
     def run(self):
         # 实例化核心算法对象----本级别
         self.pbar = tqdm(total=(len(self.klineMediumLevel) - 1))
-        simpleMacd = SimpleMacd(self.mode, self.odds)
-        for index in range(len(self.medDF['macd']) - 1):
-            simpleMacd.runStrategy(
-                self.klineMediumLevel.loc[index].to_dict(),
-                self.medDF.loc[index].astype(float).to_dict(),
+        self.simpleMacd = SimpleMacd(self.mode, self.odds, self.checkSurplus,
+                                     self.stopLoss, self.user_info)
+        for index in range(len(self.klineMediumLevel) - 1):
+            self.simpleMacd.runStrategy(
+                self.klineMediumLevel.loc[index].to_list(),
                 self.onCalculate,
                 self.completed,
             )
@@ -136,7 +139,7 @@ class Investment(threading.Thread):
     def completed(self, res):
         _step = res['step']  # 策略执行步骤
         medium_status = res['medium_status']  # 初级判断状态
-        macd_data = res['macd_data']  # macd数据包
+        macd_data = res['indicators']  # macd数据包
         kline_data = res['kline_data']  # k线数据包
 
         isBuySet = []  # 买卖点记录
@@ -149,13 +152,8 @@ class Investment(threading.Thread):
             isBuySet.append('1')
 
         # 止盈止损
-        checkSurplusFlag = self._is_checkSurplus(close_price)
-        sotpLossFlag = self._is_sotpLoss(close_price)
-        if checkSurplusFlag:
-            self.allSell(close_price, id_tamp)
-            isBuySet.append('0')
-
-        elif sotpLossFlag:
+        upldata = self.get_upldata(close_price)
+        if upldata and self.simpleMacd.runOddsMonitoring(upldata):
             self.allSell(close_price, id_tamp)
             isBuySet.append('0')
 
@@ -185,30 +183,15 @@ class Investment(threading.Thread):
         # 装车
         self.sqlHandler.insert_trade_marks_data(_kline_list, self.table_name)
 
-    def _is_checkSurplus(self, close_price):
+    def get_upldata(self, close_price):
         # 盈亏比
         if self.property != 0:
             odds = ((close_price - self.tradingPrice) / self.tradingPrice)
             if self.leverage != 0:
                 odds = odds * self.leverage
-            if odds >= 0 and odds >= self.checkSurplus:
-                return True
-            else:
-                return False
+            return odds
         else:
-            return False
-
-    def _is_sotpLoss(self, close_price):
-        if self.property != 0:
-            failure = ((close_price - self.tradingPrice) / self.tradingPrice)
-            if self.leverage != 0:
-                failure = failure * self.leverage
-            if failure <= 0 and abs(failure) >= self.stopLoss:
-                return True
-            else:
-                return False
-        else:
-            return False
+            return None
 
     def allBuy(self, mediumPrice, id_tamp):
         """

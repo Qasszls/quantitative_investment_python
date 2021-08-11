@@ -22,8 +22,8 @@ from okexApi._http import HttpApi
 
 class Trading:
     def __init__(self,
-                 checkSurplus,
-                 stopLoss,
+                 check_surplus,
+                 stop_loss,
                  mode=None,
                  odds=0.05,
                  lever=10,
@@ -32,7 +32,8 @@ class Trading:
             print('请填写用户信息')
             return
 
-        self.simpleMacd = SimpleMacd(mode, odds)
+        self.simpleMacd = SimpleMacd(mode, odds,check_surplus,
+                                                 stop_loss, user_info)
         self.publicSocketApi = PublicSocketApi(on_created=None,
                                                on_message=self._router,
                                                on_closed=self.restart,
@@ -44,8 +45,8 @@ class Trading:
         self.http = HttpApi(user_info=user_info)  # 初始化短连接
         self.timeTamp = TimeTamp()  # 初始化时间操作对象
 
-        self.checkSurplus = checkSurplus  # 玩家止盈率
-        self.stopLoss = stopLoss  # 玩家止损率
+        self.check_surplus = check_surplus  # 玩家止盈率
+        self.stop_loss = stop_loss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
         self.odds = odds  # 宽容度
         self.update_times = 0
@@ -57,10 +58,7 @@ class Trading:
         # 内部变量
         self.buy_times = 0
         # 15m
-        self.ema12 = float(user_info['ema12'])
-        self.ema26 = float(user_info['ema26'])
-        self.dea = float(user_info['dea'])
-        self.old_kl = []
+
         # 对照字典表
         self.channel_Dict = {
             'balance_and_position': self.update_position,  # 走 更新持仓信息 函数、
@@ -78,8 +76,8 @@ class Trading:
             'lever': self.lever,
             'mgnMode': 'cross',  # 保证金模式 isolated：逐仓、cross：全仓
             # 策略部分
-            'tpTriggerRate': self.checkSurplus,  # 止盈
-            'slTriggerRate': self.stopLoss,  # 止损
+            'tpTriggerRate': self.check_surplus,  # 止盈
+            'slTriggerRate': self.stop_loss,  # 止损
             'ordType':
             'market',  # 倾向策略方式 conditional：单向止盈止损、oco：双向止盈止损、trigger：计划委托
             'subscribe': user_info['subscribe'],  # 监听的频道列表
@@ -120,8 +118,8 @@ class Trading:
         #配置私有公有链接的频道
         self.publicSocketApi.subscription()
         self.privateSocketApi.subscription()
-        print('主程序已打开，用户止盈率为：' + str(self.checkSurplus * 100) + '%; 止损率为：' +
-              str(self.stopLoss * 100) + '%; 默认杠杆倍数为：' + str(self.lever) +
+        print('主程序已打开，用户止盈率为：' + str(self.check_surplus * 100) + '%; 止损率为：' +
+              str(self.stop_loss * 100) + '%; 默认杠杆倍数为：' + str(self.lever) +
               '倍;宽容度为：' + str(self.odds * 100) + '%')
         while True:
             self.get_systm_status()
@@ -129,19 +127,13 @@ class Trading:
 
     # 更新持仓数据
     def update_position(self, data):
-        if data['upl'] != '':
-            upl = float(data['upl'])
+        if data['uplRatio'] != '':
             uplRatio = float(data['uplRatio'])
-
-            def _is_checkSurplus():
-                return uplRatio >= self.checkSurplus
-
-            def _is_sotpLoss():
-                return abs(uplRatio) >= self.stopLoss
-
             # 检测止盈止损
-            if _is_checkSurplus() or _is_sotpLoss():
-                self.allSell()
+            if self.simpleMacd.runOddsMonitoring(uplRatio):
+                res = self.allSell()
+                if res:
+                    self.simpleMacd.reset_has_strong_history()
 
     # 更新用户数据
     def update_user(self, data):
@@ -201,46 +193,18 @@ class Trading:
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
-    def breathing(self, kline_data):
-        # 判断新老数据
-        # 第一次进入循环 或者 同一时间的老数据，都会进入
-        if kline_data[0] in self.old_kl:
-            # 其实可以完全不写下面的代码，但是意义就不一样了。
-            self.old_kl = kline_data
-            return
-        else:
-            # 防止数据为初始化就走下面的逻辑
-            if len(self.old_kl) == 0:
-                self.old_kl = kline_data
-                return
-
-            _k = pd.DataFrame([self.old_kl]).astype(float)
-            _k.columns = [
-                'id_tamp', 'open_price', 'high_price', 'lowest_price',
-                'close_price', 'vol', 'volCcy'
-            ]
-            KLINE_DATA = _k.to_dict('records')[0]
-            # 准备数据-macd
-            MACD_DATA = self._befor_investment(KLINE_DATA)
-            self.old_kl = kline_data
-            # 运行策略 *********** door **************
-            self.simpleMacd.runStrategy(
-                KLINE_DATA,
-                MACD_DATA,
-                self.onCalculate,
-                self.completed,
-            )
-
-    #钩子函数 计算中
-    def onCalculate(self, res):
-        # 变量定义
-        None
+    def breathing(self, data):
+        # 运行策略 *********** door **************
+        self.simpleMacd.runStrategy(
+            data,
+            self.completed,
+        )
 
     #钩子函数 计算完成
     def completed(self, res):
         medium_status = res['medium_status']  # 初级判断状态
         kline_data = res['kline_data']  # k线数据包
-        macd_data = res['macd_data']  # macd数据包
+        indicators = res['indicators']  # 指标数据包
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,打卡时间：' +
@@ -296,8 +260,10 @@ class Trading:
         res, err = self.http.close_position(params)
         if err:
             self.dingding_msg('卖出失败，请手动平仓' + str(err))
+            return False
         else:
             self.dingding_msg('卖出成功' + str(res))
+            return True
 
     # 获取服务器更新节点
     def get_systm_status(self):
@@ -338,46 +304,6 @@ class Trading:
         else:
             self.update_times = 0
             # self.dingding_msg('策略运行中，服务器没有更新计划')
-
-    def _befor_investment(self, kline_data):
-        # 私有函数
-        # 计算macd值
-        def _count_macd(price):
-            """
-            基准
-            12
-            26
-            """
-            # 获取往日 数据
-            last_ema12 = self.ema12
-            last_ema26 = self.ema26
-            last_dea = self.dea
-            # 计算当日 数据
-
-            EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
-            EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
-            DIF = EMA12 - EMA26
-            DEA = last_dea * 8 / 10 + DIF * 2 / 10
-            MACD = DIF - DEA
-            return {
-                'ema12': EMA12,
-                'ema26': EMA26,
-                'dif': DIF,
-                "dea": DEA,
-                "macd": MACD * 2,
-                "bar": MACD * 2
-            }
-
-        # 计算macd
-
-        MACD_DATA = _count_macd(kline_data['close_price'])
-        # 赋值当日macd变量
-        self.ema12 = MACD_DATA['ema12']
-        self.ema26 = MACD_DATA['ema26']
-        self.dif = MACD_DATA['dif']
-        self.dea = MACD_DATA['dea']
-        self.macd = MACD_DATA['macd']
-        return MACD_DATA
 
 
 # 工具查询---buy/sell阶段-数量

@@ -1,55 +1,10 @@
 # -*- coding:UTF-8 -*-
 """
-策略结构
-
-回测容器（调用策略代码）
-
-    本代码位置：策略代码(输入：k线；输出：买点，卖点，总金额，总仓位等)
-
-    可视化（金额与走势图绘制在html上）
-
-MACD原理
-
-数据参照：短期EMA（一般12），长期EMA（一般26），DIF（EMA(12) - EMA(26)），DEA（前一日 DEA * 8/10 + 今日 DIF * 2/10）
-    MACD：DIF与DEA的差值。红绿柱是 DIF 与 DEA 的差值 * 2.
-
-指标：
-    零轴: DIF == 0 and DEA == 0
-    零上: DIF > 0 and DEA > 0
-    零下: DIF < 0 and DEA < 0
-    金叉: MACD > 0 and MACD 昨日 <= 0
-    死叉: MACD < 0 and MACD 昨日 >= 0
-    价格不断创新低: 
-        价格低点: k线收盘价现最小值
-        价格前低: k线收盘价前最小值
-    macd快慢线 低点提高:
-        快慢线前低: DIF前最小值
-        快慢线现低: DIF现最小值
-    回抽零轴-快慢线低点上移后金叉确认:
-        快慢线低点上移（依赖金叉确认）:DIF现最小值 > DIF前最小值
-        金叉确认(如果不是零下的金叉确认，就不是我们做的点位): MACD > 0 and MACD 昨日 <= 0
-        零下: DIF < 0 and DEA < 0
-
-        执行队列
-		step0				step 1			step 2		  step3               step4
-		零下死叉============>是金叉=====>是死叉 and 水下====>是金叉====>白线低点是否上移 and 收盘价是否比前低更低
-        
-        
-        因为在零下的快慢线低点上移后，自然就完成回抽零轴的动作，故策略与公式的转换完成。
-
-代码实现
-for item in kline:
-    # 是否满足条件 买
-    status(条件是否满足),price(当前价格),kline(当日K线) = underwater_collide(item)
-
-    # 止损 小于当前价格 10%
-
-    # 止盈 大于当前价格 22%
-    
+一个完整的策略类包含
+1.策略运行函数 runStarategy
+2.止盈止损函数 isSell
 """
-from os import close
 import sys
-# import talib
 import pandas as pd
 import emoji
 
@@ -61,8 +16,36 @@ sys.path.append('..')
 from util.TimeStamp import TimeTamp
 
 
-class SimpleMacd():
-    def __init__(self, mode, odds):
+class Strategy:
+    def __init__(self, check_surplus, stop_loss):
+        self.check_surplus = check_surplus
+        self.stop_loss = stop_loss
+
+    def runStrategy(self, data, completed):
+        completed()
+
+    # 止损函数
+    def is_need_sell(self, uplRatio):
+        """
+        uplRatio 收益率
+        checkSurplus 止盈率
+        stoploss 止损率
+        """
+        if not isinstance(uplRatio, float):
+            uplRatio = float(uplRatio)
+
+        def _is_checkSurplus():
+            return uplRatio >= self.check_surplus
+
+        def _is_sotpLoss():
+            return abs(uplRatio) >= self.stop_loss
+
+        return _is_checkSurplus() or _is_sotpLoss()
+
+
+class SimpleMacd(Strategy):
+    def __init__(self, mode, odds, check_surplus, stop_loss, user_info):
+        Strategy.__init__(self, check_surplus, stop_loss)
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -71,29 +54,127 @@ class SimpleMacd():
             'first_confirmation': None,
             'again_confirmation': None
         }
+
         self.step = 0
+        self.ema12 = float(user_info['ema12'])
+        self.ema26 = float(user_info['ema26'])
+        self.ema120 = float(user_info['ema120'])
+
+        self.has_strong_history = False  # 是否有强势的历史
+        self.is_strong_gains = False  # 当前是否强势
+        self.dea = float(user_info['dea'])
+        self.old_kl = []
+
         self.mode = mode
         self.odds = odds
         self.timeTamp = TimeTamp()
 
-    def runStrategy(self, kline_data, macd_data, onCalculate, completed):
-        med_tamp = kline_data['id_tamp']
-        close_price = kline_data['close_price']
+    # 策略运行函数
+    def runStrategy(self, data, oncalculate, completed):
+        # 第一次进入循环 或者 同一时间的老数据，都会进入
+        if len(self.old_kl) == 0 or data[0] in self.old_kl:
+            # 其实可以完全不写下面的代码，但是意义就不一样了。
+            self.old_kl = data
+            return
+        self.old_kl = data
+        # k线数据
+        KLINE_DATA = self.set_kline_dict(data)
+        # 取出变量
+        med_tamp = KLINE_DATA['id_tamp']
+        close_price = KLINE_DATA['close_price']
+        # 指标数据
+        INDICATORS_DATA = self._befor_investment(KLINE_DATA)
         # 计算中 钩子
-        onCalculate({
+        oncalculate({
             'close_price': close_price,
             'id_tamp': med_tamp,
         })
+        # 记录涨幅是否强势
+        self.monitoring_status(INDICATORS_DATA, KLINE_DATA)
 
         # 核心算法，是否做多，本级别确认
-        medium_status = self.medium_read(close_price, macd_data, med_tamp)
-        # 实例化核心算法对象----高级别
+        medium_status = self.medium_read(close_price, INDICATORS_DATA,
+                                         med_tamp)
         completed({
             'medium_status': medium_status,
-            'kline_data': kline_data,
-            'macd_data': macd_data,
+            'kline_data': KLINE_DATA,
+            'indicators': INDICATORS_DATA,
             "step": self.step
         })
+
+    # 止盈止损函数
+    def runOddsMonitoring(self, uplRatio):
+        """
+        is_need_sell 是否达成了止盈止损条件 boolean
+        is_Strong 当前股价是否强势 boolean
+        """
+
+        is_need_sell = self.is_need_sell(uplRatio)
+        # 此时股价已经运行在ema120之上
+        if self.is_strong_gains:
+            self.has_strong_history = True
+            return False
+        else:
+            # 是否有过强势历史
+            if self.has_strong_history:
+                # 有过，说明目前涨势变成不强势
+                return True
+            else:
+                return is_need_sell
+
+    # 重置强势历史
+    def reset_has_strong_history(self):
+        self.has_strong_history = False
+
+    # 计算策略运行的数据
+    def _befor_investment(self, kline_data):
+        # 私有函数
+        # 计算macd值
+        price = kline_data['close_price']
+
+        # 获取往日 数据
+        last_ema12 = self.ema12
+        last_ema26 = self.ema26
+        last_ema120 = self.ema120
+        last_dea = self.dea
+        # 计算当日 数据
+
+        EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
+        EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
+        EMA120 = last_ema120 * 119 / 121 + price * 2 / 121
+        DIF = EMA12 - EMA26
+        DEA = last_dea * 8 / 10 + DIF * 2 / 10
+        MACD = DIF - DEA
+        # 计算macd
+        # 赋值当日macd变量
+
+        return {
+            'ema12': EMA12,
+            'ema26': EMA26,
+            'ema120': EMA120,
+            'dif': DIF,
+            'dea': DEA,
+            'macd': MACD,
+            "bar": MACD * 2
+        }
+
+    # 股价动态监测与记录
+    def monitoring_status(self, idata, kdata):
+        self.ema12 = idata['ema12']
+        self.ema26 = idata['ema26']
+        self.ema120 = idata['ema120']
+        self.dea = idata['dea']
+        # 涨势是否强势
+        self.is_strong_gains = float(kdata['close_price']) > idata['ema120']
+
+    # k线数据 dict化
+    def set_kline_dict(self, kline_data):
+        _k = pd.DataFrame([kline_data]).astype(float)
+        _k.columns = [
+            'id_tamp', 'open_price', 'high_price', 'lowest_price',
+            'close_price', 'vol', 'volCcy'
+        ]
+        return _k.to_dict('records')[0]
 
     # 本级别研判
     def medium_read(self, close_price, todayMacd, med_tamp):
@@ -142,8 +223,7 @@ class SimpleMacd():
             self._step_0(todayMacd)
             return False
 
-    # 工具函数
-
+    # 策略工具函数
     # 是否在水下
     def _is_under_water(self, dif, dea):
         return dif < 0 or dea < 0

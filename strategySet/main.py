@@ -10,10 +10,9 @@ import time
 import re
 
 sys.path.append('..')
-if re.search('/main/server', os.getcwd()):
-    sys.path.append(
-        '/Users/work/web/quantitative_investment_python/py/main/strategySet')
+sys.path.append('/Users/work/web/quantitative_investment_python/strategySet')
 # from util.OsHandler import OsHandler
+print(os.getcwd())
 from sqlHandler import SqlHandler
 from investment import Investment
 
@@ -30,6 +29,10 @@ class DataBackTesting:
             DBName='BTC-USDT_kline',
             charset='utf8',
         )
+        # macd 底背离
+        f = open('../config.json', 'r', encoding='utf-8')
+        _data = json.load(f)
+        self.user_info = _data['realPay']['children'][0]
 
     # 根据列表id反查列表名；清空总表对应数据；删除对应表
     def delete_market_data(self, id):
@@ -72,12 +75,9 @@ class DataBackTesting:
             self.klineMediumLevel = self._get_kline_data(
                 res1['result'], table_name)
 
-            # 获取样本数据
-            self.medDF = self._get_MACD(self.klineMediumLevel['close_price'],
-                                        self.klineMediumLevel['id_tamp'])
             return True
         else:
-            print(res1, res2, '表不存在或为空')
+            print(res1, '表不存在或为空')
             return False
 
     def _get_kline_data(self, data, table_name):
@@ -86,31 +86,6 @@ class DataBackTesting:
         #所有内容转化为数值型
         df = df.astype(float)
         return df
-
-    def _get_MACD(self,
-                  price,
-                  timeTamps,
-                  fastperiod=12,
-                  slowperiod=26,
-                  signalperiod=9):
-        """
-            入参：价格和基准等
-            出参：dataFrame格式的数据结构
-            """
-        ewma12 = price.ewm(span=fastperiod).mean()
-        ewma60 = price.ewm(span=slowperiod).mean()
-        dif = ewma12 - ewma60
-        dea = dif.ewm(span=signalperiod).mean()
-        bar = (dif - dea
-               )  #有些地方的bar = (dif-dea)*2，但是talib中MACD的计算是bar = (dif-dea)*1
-        macd = dif - dea
-        return pd.DataFrame({
-            'macd': macd,
-            'dif': dif,
-            'dea': dea,
-            'bar': bar,
-            'id_tamp': timeTamps.values
-        })
 
     def search_table(self, table_name, time=[]):
         if len(time) > 0:
@@ -148,17 +123,22 @@ class DataBackTesting:
             print('已有同名表')
         else:
             # 首先按照时间区段解析行情数据
-            market_data_res = self._get_market_data('2020_kline_1H', time)
+            market_data_res = self._get_market_data('2020_kline_15m', time)
             if market_data_res:
                 # 表不存在 创建表
                 create_res = self.sqlHandler.create_trade_marks_table(
                     table_name)
                 if create_res['status']:
                     # 创建表成功，执行回测
-                    self._run_investment(checkSurplus, stopLoss, principal,
-                                         table_name, self.klineMediumLevel,
-                                         self.medDF, mode, odds, _name,
-                                         leverage)
+                    # 遍历并插入数据
+                    investment = Investment(checkSurplus, stopLoss, principal,
+                                            self.klineMediumLevel, table_name,
+                                            mode, odds, _name, leverage,
+                                            self.user_info)
+                    # 返回要写入table_record表的内容
+                    investment.start()
+                    # 更新record表内容 table_name
+                    self.update_table_record(table_name)
 
     # 查询指定表，返回表头列表
     def _get_table_column(self, table_name):
@@ -170,17 +150,6 @@ class DataBackTesting:
             if item[0] not in column:
                 column.append(item[0])
         return column
-
-    def _run_investment(self, checkSurplus, stopLoss, principal, table_name,
-                        klineMediumLevel, medDF, mode, odds, _name, leverage):
-        # 遍历并插入数据
-        investment = Investment(checkSurplus, stopLoss, principal,
-                                klineMediumLevel, medDF, table_name, mode,
-                                odds, _name, leverage)
-        # 返回要写入table_record表的内容
-        investment.start()
-        # 更新record表内容 table_name
-        self.update_table_record(table_name)
 
     def update_table_record(self, table_name):
         # 更新record表内容 table_name

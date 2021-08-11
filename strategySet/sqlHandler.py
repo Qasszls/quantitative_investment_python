@@ -1,6 +1,5 @@
 # -*- coding:UTF-8 -*-
 from re import T
-from numpy import result_type
 import pymysql
 from dbutils.pooled_db import PooledDB
 
@@ -128,7 +127,7 @@ class SqlHandler:
 
     # 创建表
     def create_trade_marks_table(self, table_name):
-        sql = "CREATE TABLE " + table_name + " (id_tamp VARCHAR (255) NOT NULL,open_price VARCHAR (255),high_price VARCHAR (255),lowest_price VARCHAR (255),close_price VARCHAR (255),vol VARCHAR (255),volCcy VARCHAR (255),check_surplus VARCHAR (255),stop_loss VARCHAR (255),principal VARCHAR (255),property VARCHAR (255),trading_price VARCHAR (255),buy_traces VARCHAR (255),date VARCHAR (255),is_buy_set VARCHAR (255),macd VARCHAR (255),dif VARCHAR (255),dea VARCHAR (255),bar VARCHAR (255),step VARCHAR (255),PRIMARY KEY (id_tamp))"
+        sql = "CREATE TABLE " + table_name + " (id_tamp VARCHAR (255) NOT NULL,open_price VARCHAR (255),high_price VARCHAR (255),lowest_price VARCHAR (255),close_price VARCHAR (255),vol VARCHAR (255),volCcy VARCHAR (255),check_surplus VARCHAR (255),stop_loss VARCHAR (255),principal VARCHAR (255),property VARCHAR (255),trading_price VARCHAR (255),buy_traces VARCHAR (255),date VARCHAR (255),is_buy_set VARCHAR (255),ema12 VARCHAR (255),ema26 VARCHAR (255),ema120 VARCHAR (255),macd VARCHAR (255),dif VARCHAR (255),dea VARCHAR (255),bar VARCHAR (255),step VARCHAR (255),PRIMARY KEY (id_tamp))"
         influence = 0
         text = ''
         status = ''
@@ -191,6 +190,6 @@ class SqlHandler:
             conn.rollback()
             text = str(e) + str(influence) + 'insert' + name
             status = False
-            print(sql,'\n',text)
+            print(sql, '\n', text)
         self._close(cursor, conn)
         return {'status': status, "text": text, "result": result}
