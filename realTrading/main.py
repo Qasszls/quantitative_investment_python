@@ -124,9 +124,8 @@ class Trading:
               str(self.stopLoss * 100) + '%; 默认杠杆倍数为：' + str(self.lever) +
               '倍;宽容度为：' + str(self.odds * 100) + '%')
         while True:
-            print('服务器状态轮询中……')
             self.get_systm_status()
-            time.sleep(3600)
+            time.sleep(10)
 
     # 更新持仓数据
     def update_position(self, data):
@@ -158,15 +157,16 @@ class Trading:
 
     # 重启策略
     def restart(self, _res):
-        if self.update_times > 0:
+        while True:
+            time.sleep(20)
             _ntamp = time.time() * 1000
-            print('当前时间')
-            print(time.time() * 1000, '未来时间', _ntamp, '睡眠',
-                  (self.update_times - _ntamp) / 1000, '秒')
-            self.dingding_msg('当前时间' + str(time.time() * 1000) + '未来时间' +
-                              str(_ntamp) + '睡眠' +
-                              str((self.update_times - _ntamp) / 1000) + '秒')
-            time.sleep(self.update_times - _ntamp)
+            if self.update_times > _ntamp:
+                print('睡眠中', (self.update_times - _ntamp) / 1000, '秒')
+                self.dingding_msg('睡眠中' +
+                                  str((self.update_times - _ntamp) / 1000) +
+                                  '秒')
+            else:
+                break
         name = _res['data']
         print(name + '新家园建立')
         if name == 'public':
@@ -197,7 +197,7 @@ class Trading:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        text = text + '  ' + self.timeTamp.get_time_normal(
+        text = text + '  作业时间：' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
@@ -243,8 +243,8 @@ class Trading:
         macd_data = res['macd_data']  # macd数据包
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
-        self.dingding_msg('时间：' + self.timeTamp.get_time_normal(id_tamp) +
-                          '已完成，步骤：' + str(_step))
+        self.dingding_msg('已完成，步骤：' + str(_step) + ' ,打卡时间：' +
+                          self.timeTamp.get_time_normal(id_tamp))
         if medium_status and self.buy_times <= 2:
             #买入 钩子
             self.allBuy()
@@ -336,7 +336,8 @@ class Trading:
             time.sleep(3)
             self.get_systm_status()
         else:
-            self.dingding_msg('策略运行中，服务器没有更新计划')
+            self.update_times = 0
+            # self.dingding_msg('策略运行中，服务器没有更新计划')
 
     def _befor_investment(self, kline_data):
         # 私有函数
