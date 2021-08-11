@@ -134,7 +134,7 @@ class BaseSocketApi:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        text = text + '  ' + self.timeTamp.get_time_normal(
+        text = text + '  作业时间' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
