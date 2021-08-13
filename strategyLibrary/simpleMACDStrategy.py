@@ -71,7 +71,7 @@ class SimpleMacd(Strategy):
         self.timeTamp = TimeTamp()
 
     # 策略运行函数
-    def runStrategy(self, data, oncalculate, completed):
+    def runStrategy(self, data,  completed):
         # 第一次进入循环 或者 同一时间的老数据，都会进入
         if len(self.old_kl) == 0 or data[0] in self.old_kl:
             # 其实可以完全不写下面的代码，但是意义就不一样了。
@@ -85,11 +85,6 @@ class SimpleMacd(Strategy):
         close_price = KLINE_DATA['close_price']
         # 指标数据
         INDICATORS_DATA = self._befor_investment(KLINE_DATA)
-        # 计算中 钩子
-        oncalculate({
-            'close_price': close_price,
-            'id_tamp': med_tamp,
-        })
         # 记录涨幅是否强势
         self.monitoring_status(INDICATORS_DATA, KLINE_DATA)
 
