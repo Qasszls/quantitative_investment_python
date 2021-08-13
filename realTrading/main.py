@@ -49,7 +49,6 @@ class Trading:
         self.stop_loss = stop_loss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
         self.odds = odds  # 宽容度
-        self.update_times = 0
         # self.upl = ''  # 未实现收益
         # self.uplRatio = ''  # 未实现收益率
         #用户层面
@@ -123,7 +122,7 @@ class Trading:
               '倍;宽容度为：' + str(self.odds * 100) + '%')
         while True:
             self.get_systm_status()
-            time.sleep(10)
+            time.sleep(300)
 
     # 更新持仓数据
     def update_position(self, data):
@@ -149,16 +148,6 @@ class Trading:
 
     # 重启策略
     def restart(self, _res):
-        while True:
-            time.sleep(20)
-            _ntamp = time.time() * 1000
-            if self.update_times > _ntamp:
-                print('睡眠中', (self.update_times - _ntamp) / 1000, '秒')
-                self.dingding_msg('睡眠中' +
-                                  str((self.update_times - _ntamp) / 1000) +
-                                  '秒')
-            else:
-                break
         name = _res['data']
         print(name + '新家园建立')
         if name == 'public':
@@ -295,16 +284,12 @@ class Trading:
                           self.timeTamp.get_time_normal(item['begin']) +
                           '; 更新结束时间: ' +
                           self.timeTamp.get_time_normal(item['end']))
-            self.update_times = _utimes
         elif error:
             # 网络问题 轮询请求接口，等待网络恢复
             print('get_systm_status 出现问题')
             time.sleep(3)
             self.get_systm_status()
-        else:
-            self.update_times = 0
-            # self.dingding_msg('策略运行中，服务器没有更新计划')
-
+       
 
 # 工具查询---buy/sell阶段-数量
 
@@ -364,5 +349,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.16, 0.08, user_info=_ulist, mode='loose')
+    trading = Trading(0.28, 0.12, user_info=_ulist, mode='loose')
     trading._init()

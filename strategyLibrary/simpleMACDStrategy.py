@@ -38,7 +38,8 @@ class Strategy:
             return uplRatio >= self.check_surplus
 
         def _is_sotpLoss():
-            return abs(uplRatio) >= self.stop_loss
+            if uplRatio <= 0:
+                return abs(uplRatio) >= self.stop_loss
 
         return _is_checkSurplus() or _is_sotpLoss()
 
@@ -58,7 +59,7 @@ class SimpleMacd(Strategy):
         self.step = 0
         self.ema12 = float(user_info['ema12'])
         self.ema26 = float(user_info['ema26'])
-        self.ema120 = float(user_info['ema120'])
+        self.ema240 = float(user_info['ema240'])
 
         self.has_strong_history = False  # 是否有强势的历史
         self.is_strong_gains = False  # 当前是否强势
@@ -110,7 +111,7 @@ class SimpleMacd(Strategy):
         """
 
         is_need_sell = self.is_need_sell(uplRatio)
-        # 此时股价已经运行在ema120之上
+        # 此时股价已经运行在ema240之上
         if self.is_strong_gains:
             self.has_strong_history = True
             return False
@@ -135,13 +136,13 @@ class SimpleMacd(Strategy):
         # 获取往日 数据
         last_ema12 = self.ema12
         last_ema26 = self.ema26
-        last_ema120 = self.ema120
+        last_ema240 = self.ema240
         last_dea = self.dea
         # 计算当日 数据
 
         EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
         EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
-        EMA120 = last_ema120 * 119 / 121 + price * 2 / 121
+        EMA240 = last_ema240 * 119 / 121 + price * 2 / 121
         DIF = EMA12 - EMA26
         DEA = last_dea * 8 / 10 + DIF * 2 / 10
         MACD = DIF - DEA
@@ -151,7 +152,7 @@ class SimpleMacd(Strategy):
         return {
             'ema12': EMA12,
             'ema26': EMA26,
-            'ema120': EMA120,
+            'ema240': EMA240,
             'dif': DIF,
             'dea': DEA,
             'macd': MACD,
@@ -162,10 +163,10 @@ class SimpleMacd(Strategy):
     def monitoring_status(self, idata, kdata):
         self.ema12 = idata['ema12']
         self.ema26 = idata['ema26']
-        self.ema120 = idata['ema120']
+        self.ema240 = idata['ema240']
         self.dea = idata['dea']
         # 涨势是否强势
-        self.is_strong_gains = float(kdata['close_price']) > idata['ema120']
+        self.is_strong_gains = float(kdata['close_price']) > idata['ema240']
 
     # k线数据 dict化
     def set_kline_dict(self, kline_data):
