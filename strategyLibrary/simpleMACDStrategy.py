@@ -77,7 +77,7 @@ class SimpleMacd(Strategy):
             # 其实可以完全不写下面的代码，但是意义就不一样了。
             self.old_kl = data
             return
-        self.old_kl = data
+ 
         # k线数据
         KLINE_DATA = self.set_kline_dict(data)
         # 取出变量
@@ -98,6 +98,7 @@ class SimpleMacd(Strategy):
             "step": self.step,
             "other": {' has_strong_history':self.has_strong_history}
         })
+        self.old_kl = data
 
     # 止盈止损函数
     def runOddsMonitoring(self, uplRatio):
