@@ -196,8 +196,10 @@ class Trading:
         indicators = res['indicators']  # 指标数据包
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
+        # 其他数据
+        has_strong_history = res['other']['has_strong_history']  
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,打卡时间：' +
-                          self.timeTamp.get_time_normal(id_tamp))
+                          self.timeTamp.get_time_normal(id_tamp))+'是否有强势历史'+str(has_strong_history)+"当前240天线数据:"+str(indicators['ema240'])
         if medium_status and self.buy_times <= 2:
             #买入 钩子
             self.allBuy()

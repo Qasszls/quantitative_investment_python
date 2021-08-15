@@ -95,7 +95,8 @@ class SimpleMacd(Strategy):
             'medium_status': medium_status,
             'kline_data': KLINE_DATA,
             'indicators': INDICATORS_DATA,
-            "step": self.step
+            "step": self.step,
+            "other": {' has_strong_history':self.has_strong_history}
         })
 
     # 止盈止损函数
@@ -111,6 +112,7 @@ class SimpleMacd(Strategy):
             self.has_strong_history = True
             return False
         else:
+            print('当前股价是否强势过:',self.has_strong_history)
             # 是否有过强势历史
             if self.has_strong_history:
                 # 有过，说明目前涨势变成不强势
