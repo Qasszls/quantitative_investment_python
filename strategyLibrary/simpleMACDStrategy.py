@@ -71,13 +71,13 @@ class SimpleMacd(Strategy):
         self.timeTamp = TimeTamp()
 
     # 策略运行函数
-    def runStrategy(self, data,  completed):
+    def runStrategy(self, data, completed):
         # 第一次进入循环 或者 同一时间的老数据，都会进入
         if len(self.old_kl) == 0 or data[0] in self.old_kl:
             # 其实可以完全不写下面的代码，但是意义就不一样了。
             self.old_kl = data
             return
- 
+
         # k线数据
         KLINE_DATA = self.set_kline_dict(data)
         # 取出变量
@@ -96,7 +96,6 @@ class SimpleMacd(Strategy):
             'kline_data': KLINE_DATA,
             'indicators': INDICATORS_DATA,
             "step": self.step,
-            "other": {' has_strong_history':self.has_strong_history}
         })
         self.old_kl = data
 
@@ -113,7 +112,6 @@ class SimpleMacd(Strategy):
             self.has_strong_history = True
             return False
         else:
-            print('当前股价是否强势过:',self.has_strong_history)
             # 是否有过强势历史
             if self.has_strong_history:
                 # 有过，说明目前涨势变成不强势
