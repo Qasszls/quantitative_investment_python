@@ -5,12 +5,9 @@ import pandas as pd
 import numpy as np
 import emoji
 import sys
-import threading
 import time
-import asyncio
 import re
 import json
-import gc
 
 sys.path.append('..')
 from util.TimeStamp import TimeTamp
@@ -26,14 +23,14 @@ class Trading:
                  stop_loss,
                  mode=None,
                  odds=0.05,
-                 lever=10,
+                 lever=8,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
             return
 
-        self.simpleMacd = SimpleMacd(mode, odds,check_surplus,
-                                                 stop_loss, user_info)
+        self.simpleMacd = SimpleMacd(mode, odds, check_surplus, stop_loss,
+                                     user_info)
         self.publicSocketApi = PublicSocketApi(on_created=None,
                                                on_message=self._router,
                                                on_closed=self.restart,
@@ -198,7 +195,8 @@ class Trading:
         id_tamp = kline_data['id_tamp']  # 时间戳
         # 其他数据
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,打卡时间：' +
-                          self.timeTamp.get_time_normal(id_tamp))+"当前240天线数据:"+str(indicators['ema240'])
+                          self.timeTamp.get_time_normal(id_tamp)
+                          ) + "当前240天线数据:" + str(indicators['ema240'])
         if medium_status and self.buy_times <= 2:
             #买入 钩子
             self.allBuy()
@@ -290,7 +288,7 @@ class Trading:
             print('get_systm_status 出现问题')
             time.sleep(3)
             self.get_systm_status()
-       
+
 
 # 工具查询---buy/sell阶段-数量
 
@@ -350,5 +348,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.28, 0.12, user_info=_ulist, mode='loose')
+    trading = Trading(0.38, 0.18, user_info=_ulist, mode='loose')
     trading._init()

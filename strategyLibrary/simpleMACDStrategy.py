@@ -112,12 +112,13 @@ class SimpleMacd(Strategy):
             self.has_strong_history = True
             return False
         else:
-            # 是否有过强势历史
-            if self.has_strong_history:
-                # 有过，说明目前涨势变成不强势
-                return True
-            else:
-                return is_need_sell
+            # # 是否有过强势历史
+            # if self.has_strong_history:
+            #     # 有过，说明目前涨势变成不强势
+            #     return True
+            # else:
+            #     return is_need_sell
+            return is_need_sell
 
     # 重置强势历史
     def reset_has_strong_history(self):
@@ -217,7 +218,7 @@ class SimpleMacd(Strategy):
                 return True
         elif self.step == 9999:
             self._reset()
-            self._step_0(todayMacd)
+            self._step_2(todayMacd)
             return False
 
     # 策略工具函数
