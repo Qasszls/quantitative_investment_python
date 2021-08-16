@@ -65,19 +65,6 @@ trading-calendars==2.1.1
 typing-extensions==3.10.0.0
 tzlocal==2.1
 urllib3==1.26.6
-vnpy @ file:///Users/admin/Desktop/vnpy-2.4.0
-vnpy-bybit==2021.6.21
-vnpy-ctabacktester==1.0.1
-vnpy-ctastrategy==1.0.2
-vnpy-ctp==6.5.1.5
-vnpy-ctptest==6.5.1.3
-vnpy-datamanager==1.0.1
-vnpy-deribit==2.0.1.0
-vnpy-okex==2021.4.21.5
-vnpy-rest==1.0.1
-vnpy-riskmanager==1.0.1
-vnpy-websocket==1.0.1
-vnpy-xtp==2.2.27.5
 websocket-client==1.2.0
 WMI==1.4.9
 yarl==1.6.3
