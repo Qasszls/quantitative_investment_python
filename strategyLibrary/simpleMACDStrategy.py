@@ -77,9 +77,8 @@ class SimpleMacd(Strategy):
             # 其实可以完全不写下面的代码，但是意义就不一样了。
             self.old_kl = data
             return
-
         # k线数据
-        KLINE_DATA = self.set_kline_dict(data)
+        KLINE_DATA = self.set_kline_dict(self.old_kl)
         # 取出变量
         med_tamp = KLINE_DATA['id_tamp']
         close_price = KLINE_DATA['close_price']
@@ -91,13 +90,14 @@ class SimpleMacd(Strategy):
         # 核心算法，是否做多，本级别确认
         medium_status = self.medium_read(close_price, INDICATORS_DATA,
                                          med_tamp)
+        self.old_kl = data
         completed({
             'medium_status': medium_status,
             'kline_data': KLINE_DATA,
             'indicators': INDICATORS_DATA,
             "step": self.step,
         })
-        self.old_kl = data
+        
 
     # 止盈止损函数
     def runOddsMonitoring(self, uplRatio):
