@@ -1,20 +1,23 @@
 # -*- coding:UTF-8 -*-
 
+from okexApi._http import HttpApi
+from okexApi._websocket import PrivateSocketApi
+from okexApi._websocket import PublicSocketApi
+from strategyLibrary.simpleMACDStrategy import SimpleMacd
+from util.TimeStamp import TimeTamp
 from dingtalkchatbot.chatbot import DingtalkChatbot
 import pandas as pd
 import numpy as np
 import emoji
 import sys
+import threading
 import time
+import asyncio
 import re
 import json
+import gc
 
 sys.path.append('..')
-from util.TimeStamp import TimeTamp
-from strategyLibrary.simpleMACDStrategy import SimpleMacd
-from okexApi._websocket import PublicSocketApi
-from okexApi._websocket import PrivateSocketApi
-from okexApi._http import HttpApi
 
 
 class Trading:
@@ -23,14 +26,14 @@ class Trading:
                  stop_loss,
                  mode=None,
                  odds=0.05,
-                 lever=8,
+                 lever=10,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
             return
 
-        self.simpleMacd = SimpleMacd(mode, odds, check_surplus, stop_loss,
-                                     user_info)
+        self.simpleMacd = SimpleMacd(mode, odds, check_surplus,
+                                     stop_loss, user_info)
         self.publicSocketApi = PublicSocketApi(on_created=None,
                                                on_message=self._router,
                                                on_closed=self.restart,
@@ -48,7 +51,7 @@ class Trading:
         self.odds = odds  # 宽容度
         # self.upl = ''  # 未实现收益
         # self.uplRatio = ''  # 未实现收益率
-        #用户层面
+        # 用户层面
         self._c = 0  # 现金余额 - 默认为USDT
 
         # 内部变量
@@ -60,7 +63,7 @@ class Trading:
             'balance_and_position': self.update_position,  # 走 更新持仓信息 函数、
             'positions': self.update_position,  # 走 同上的函数
             "candle": self.breathing,  # 走 行情检测 函数
-            'account': self.update_user,  #走 更新用户信息 函数
+            'account': self.update_user,  # 走 更新用户信息 函数
         }
 
         self.okex_api_info = {
@@ -111,7 +114,7 @@ class Trading:
     def _init(self):
         # 配置杠杆
         self._set_lever()
-        #配置私有公有链接的频道
+        # 配置私有公有链接的频道
         self.publicSocketApi.subscription()
         self.privateSocketApi.subscription()
         print('主程序已打开，用户止盈率为：' + str(self.check_surplus * 100) + '%; 止损率为：' +
@@ -186,7 +189,7 @@ class Trading:
             self.completed,
         )
 
-    #钩子函数 计算完成
+    # 钩子函数 计算完成
     def completed(self, res):
         medium_status = res['medium_status']  # 初级判断状态
         kline_data = res['kline_data']  # k线数据包
@@ -194,12 +197,10 @@ class Trading:
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
         # 其他数据
-        print(indicators)
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,打卡时间：' +
-                          self.timeTamp.get_time_normal(id_tamp)
-                          )
+                          self.timeTamp.get_time_normal(id_tamp)+"当前240天线数据:"+str(indicators['ema240']))
         if medium_status and self.buy_times <= 2:
-            #买入 钩子
+            # 买入 钩子
             self.allBuy()
 
     # 下单
@@ -293,9 +294,10 @@ class Trading:
 
 # 工具查询---buy/sell阶段-数量
 
+
     def _set_lever(self):
         print('杠杆配置中')
-        #设置杠杆倍数 交易前配置
+        # 设置杠杆倍数 交易前配置
         instId = self.okex_api_info['instId']
         lever = self.okex_api_info['lever']
         mgnMode = self.okex_api_info['mgnMode']
@@ -341,6 +343,7 @@ class Trading:
             'availSell': _m_s_availSell,
         }
 
+
 if __name__ == "__main__":
     # 获取要执行的用户配置
 
@@ -349,5 +352,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.38, 0.18, user_info=_ulist, mode='loose')
+    trading = Trading(0.28, 0.12, user_info=_ulist, mode='loose')
     trading._init()
