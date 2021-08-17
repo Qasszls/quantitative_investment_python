@@ -124,9 +124,6 @@ class SimpleMacd(Strategy):
         last_ema240 = self.ema240
         last_dea = self.dea
         # 计算当日 数据
-        print('数据集中营前', self.ema12, self.ema26,
-              self.ema240,
-              self.dea)
         EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
         EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
         EMA240 = last_ema240 * 239 / 241 + price * 2 / 241
@@ -135,9 +132,6 @@ class SimpleMacd(Strategy):
         MACD = DIF - DEA
         # 计算macd
         # 赋值当日macd变量
-        print('数据集中营后', price, 'ema12', EMA12,
-              'ema26', EMA26,
-              'ema240', EMA240)
         return {
             'ema12': EMA12,
             'ema26': EMA26,
