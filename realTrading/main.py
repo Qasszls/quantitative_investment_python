@@ -198,7 +198,7 @@ class Trading:
         # 其他数据
         self.dingding_msg('已完成，步骤：' + str(_step) + '\n,打卡时间：' +
                           self.timeTamp.get_time_normal(id_tamp) +
-                          ';\n ema240天线: ' + str(indicators['ema240']))
+                          ';\n ema240均线: ' + str(indicators['ema240']))
         if medium_status and self.buy_times <= 2:
             # 买入 钩子
             self.allBuy()

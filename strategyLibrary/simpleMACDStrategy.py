@@ -4,6 +4,7 @@
 1.策略运行函数 runStarategy
 2.止盈止损函数 isSell
 """
+from util.TimeStamp import TimeTamp
 import sys
 import pandas as pd
 import emoji
@@ -13,7 +14,6 @@ import time
 # talib.OBV
 
 sys.path.append('..')
-from util.TimeStamp import TimeTamp
 
 
 class Strategy:
@@ -124,7 +124,9 @@ class SimpleMacd(Strategy):
         last_ema240 = self.ema240
         last_dea = self.dea
         # 计算当日 数据
-
+        print('数据集中营前', self.ema12, self.ema26,
+              self.ema240,
+              self.dea)
         EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
         EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
         EMA240 = last_ema240 * 239 / 241 + price * 2 / 241
@@ -133,7 +135,9 @@ class SimpleMacd(Strategy):
         MACD = DIF - DEA
         # 计算macd
         # 赋值当日macd变量
-
+        print('数据集中营后', price, 'ema12', EMA12,
+              'ema26', EMA26,
+              'ema240', EMA240)
         return {
             'ema12': EMA12,
             'ema26': EMA26,
@@ -218,7 +222,7 @@ class SimpleMacd(Strategy):
     def _is_golden_cross(self, macd):
         return macd > 0
 
-    #非严格模式的 白线收盘价是否背离
+    # 非严格模式的 白线收盘价是否背离
     def _loose_deviate_from(self):
         odds = self.odds
 
@@ -326,7 +330,7 @@ class SimpleMacd(Strategy):
         else:
             self.step = 0
 
-    #背离记录模块 价格与dif
+    # 背离记录模块 价格与dif
     def price_lowest_record(self, close_price, time_quantum):
         if self.lowest_price[time_quantum] == None:
             self.lowest_price[time_quantum] = close_price
