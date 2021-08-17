@@ -1,6 +1,15 @@
 # -*- coding:UTF-8 -*-
 
 
+import emoji
+import numpy as np
+import pandas as pd
+from dingtalkchatbot.chatbot import DingtalkChatbot
+from util.TimeStamp import TimeTamp
+from strategyLibrary.simpleMACDStrategy import SimpleMacd
+from okexApi._websocket import PublicSocketApi
+from okexApi._websocket import PrivateSocketApi
+from okexApi._http import HttpApi
 import sys
 import threading
 import time
@@ -10,15 +19,7 @@ import json
 import gc
 
 sys.path.append('..')
-from okexApi._http import HttpApi
-from okexApi._websocket import PrivateSocketApi
-from okexApi._websocket import PublicSocketApi
-from strategyLibrary.simpleMACDStrategy import SimpleMacd
-from util.TimeStamp import TimeTamp
-from dingtalkchatbot.chatbot import DingtalkChatbot
-import pandas as pd
-import numpy as np
-import emoji
+
 
 class Trading:
     def __init__(self,
@@ -130,9 +131,7 @@ class Trading:
             uplRatio = float(data['uplRatio'])
             # 检测止盈止损
             if self.simpleMacd.runOddsMonitoring(uplRatio):
-                res = self.allSell()
-                if res:
-                    self.simpleMacd.reset_has_strong_history()
+                self.allSell()
 
     # 更新用户数据
     def update_user(self, data):
@@ -198,7 +197,7 @@ class Trading:
         id_tamp = kline_data['id_tamp']  # 时间戳
         # 其他数据
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,打卡时间：' +
-                          self.timeTamp.get_time_normal(id_tamp) )
+                          self.timeTamp.get_time_normal(id_tamp))
         if medium_status and self.buy_times <= 2:
             # 买入 钩子
             self.allBuy()
@@ -294,7 +293,6 @@ class Trading:
 
 # 工具查询---buy/sell阶段-数量
 
-
     def _set_lever(self):
         print('杠杆配置中')
         # 设置杠杆倍数 交易前配置
@@ -352,5 +350,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.28, 0.12, user_info=_ulist, mode='loose')
+    trading = Trading(0.26, 0.10, user_info=_ulist, mode='loose')
     trading._init()

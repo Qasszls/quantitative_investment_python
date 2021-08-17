@@ -112,17 +112,8 @@ class SimpleMacd(Strategy):
             self.has_strong_history = True
             return False
         else:
-            # # 是否有过强势历史
-            # if self.has_strong_history:
-            #     # 有过，说明目前涨势变成不强势
-            #     return True
-            # else:
-            #     return is_need_sell
             return is_need_sell
 
-    # 重置强势历史
-    def reset_has_strong_history(self):
-        self.has_strong_history = False
 
     # 计算策略运行的数据
     def _befor_investment(self, kline_data):
@@ -139,7 +130,7 @@ class SimpleMacd(Strategy):
 
         EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
         EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
-        EMA240 = last_ema240 * 119 / 121 + price * 2 / 121
+        EMA240 = last_ema240 * 239 / 241 + price * 2 / 241
         DIF = EMA12 - EMA26
         DEA = last_dea * 8 / 10 + DIF * 2 / 10
         MACD = DIF - DEA
