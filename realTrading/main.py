@@ -1,6 +1,5 @@
 # -*- coding:UTF-8 -*-
 
-
 import sys
 import threading
 import time
@@ -20,6 +19,7 @@ import pandas as pd
 import numpy as np
 import emoji
 
+
 class Trading:
     def __init__(self,
                  check_surplus,
@@ -32,8 +32,8 @@ class Trading:
             print('请填写用户信息')
             return
 
-        self.simpleMacd = SimpleMacd(mode, odds, check_surplus,
-                                     stop_loss, user_info)
+        self.simpleMacd = SimpleMacd(mode, odds, check_surplus, stop_loss,
+                                     user_info)
         self.publicSocketApi = PublicSocketApi(on_created=None,
                                                on_message=self._router,
                                                on_closed=self.restart,
@@ -131,8 +131,6 @@ class Trading:
             # 检测止盈止损
             if self.simpleMacd.runOddsMonitoring(uplRatio):
                 res = self.allSell()
-                if res:
-                    self.simpleMacd.reset_has_strong_history()
 
     # 更新用户数据
     def update_user(self, data):
@@ -178,7 +176,7 @@ class Trading:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        text = text + '  作业时间：' + self.timeTamp.get_time_normal(
+        text = text + '\n作业时间：' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
@@ -197,8 +195,9 @@ class Trading:
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
         # 其他数据
-        self.dingding_msg('已完成，步骤：' + str(_step) + ' ,打卡时间：' +
-                          self.timeTamp.get_time_normal(id_tamp) )
+        self.dingding_msg('已完成，步骤：' + str(_step) + '\n,打卡时间：' +
+                          self.timeTamp.get_time_normal(id_tamp) +
+                          ';\n ema240天线: ' + str(indicators['ema240']))
         if medium_status and self.buy_times <= 2:
             # 买入 钩子
             self.allBuy()
@@ -265,11 +264,11 @@ class Trading:
                     self.dingding_msg(
                         '服务器正在更新中,更新开始时间: ' +
                         self.timeTamp.get_time_normal(item['begin']) +
-                        '; 更新结束时间: ' +
+                        ';\n更新结束时间: ' +
                         self.timeTamp.get_time_normal(item['end']))
                     print('服务器正在更新中,更新开始时间: ' +
                           self.timeTamp.get_time_normal(item['begin']) +
-                          '; 更新结束时间: ' +
+                          ';\n更新结束时间: ' +
                           self.timeTamp.get_time_normal(item['end']))
                     # 找出最长更新时间段
                     if _utimes < int(item['end']):
@@ -279,7 +278,7 @@ class Trading:
                     self.dingding_msg(
                         '服务器有更新计划,更新开始时间: ' +
                         self.timeTamp.get_time_normal(item['begin']) +
-                        '; 更新结束时间: ' +
+                        ';\n更新结束时间: ' +
                         self.timeTamp.get_time_normal(item['end']))
                     print('服务器有更新计划,更新开始时间: ' +
                           self.timeTamp.get_time_normal(item['begin']) +
@@ -293,7 +292,6 @@ class Trading:
 
 
 # 工具查询---buy/sell阶段-数量
-
 
     def _set_lever(self):
         print('杠杆配置中')
@@ -342,7 +340,6 @@ class Trading:
             'availBuy': _m_s_availBuy,
             'availSell': _m_s_availSell,
         }
-
 
 if __name__ == "__main__":
     # 获取要执行的用户配置

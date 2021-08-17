@@ -97,7 +97,6 @@ class SimpleMacd(Strategy):
             'indicators': INDICATORS_DATA,
             "step": self.step,
         })
-        
 
     # 止盈止损函数
     def runOddsMonitoring(self, uplRatio):
@@ -109,20 +108,9 @@ class SimpleMacd(Strategy):
         is_need_sell = self.is_need_sell(uplRatio)
         # 此时股价已经运行在ema240之上
         if self.is_strong_gains:
-            self.has_strong_history = True
             return False
         else:
-            # # 是否有过强势历史
-            # if self.has_strong_history:
-            #     # 有过，说明目前涨势变成不强势
-            #     return True
-            # else:
-            #     return is_need_sell
             return is_need_sell
-
-    # 重置强势历史
-    def reset_has_strong_history(self):
-        self.has_strong_history = False
 
     # 计算策略运行的数据
     def _befor_investment(self, kline_data):
