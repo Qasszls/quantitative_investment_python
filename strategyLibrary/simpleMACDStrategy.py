@@ -127,7 +127,7 @@ class SimpleMacd(Strategy):
 
         EMA12 = last_ema12 * 11 / 13 + price * 2 / 13
         EMA26 = last_ema26 * 25 / 27 + price * 2 / 27
-        EMA240 = last_ema240 * 119 / 121 + price * 2 / 121
+        EMA240 = last_ema240 * 239 / 241 + price * 2 / 241
         DIF = EMA12 - EMA26
         DEA = last_dea * 8 / 10 + DIF * 2 / 10
         MACD = DIF - DEA
