@@ -1,5 +1,8 @@
 # -*- coding:UTF-8 -*-
 
+import emoji
+import numpy as np
+import pandas as pd
 import sys
 import threading
 import time
@@ -9,15 +12,12 @@ import json
 import gc
 
 sys.path.append('..')
-from okexApi._http import HttpApi
-from okexApi._websocket import PrivateSocketApi
-from okexApi._websocket import PublicSocketApi
-from strategyLibrary.simpleMACDStrategy import SimpleMacd
-from util.TimeStamp import TimeTamp
 from dingtalkchatbot.chatbot import DingtalkChatbot
-import pandas as pd
-import numpy as np
-import emoji
+from util.TimeStamp import TimeTamp
+from strategyLibrary.simpleMACDStrategy import SimpleMacd
+from okexApi._websocket import PublicSocketApi
+from okexApi._websocket import PrivateSocketApi
+from okexApi._http import HttpApi
 
 
 class Trading:
@@ -130,7 +130,7 @@ class Trading:
             uplRatio = float(data['uplRatio'])
             # 检测止盈止损
             if self.simpleMacd.runOddsMonitoring(uplRatio):
-                res = self.allSell()
+                self.allSell()
 
     # 更新用户数据
     def update_user(self, data):
@@ -352,5 +352,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.28, 0.12, user_info=_ulist, mode='loose')
+    trading = Trading(0.26, 0.10, user_info=_ulist, mode='loose')
     trading._init()
