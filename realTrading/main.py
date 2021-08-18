@@ -122,7 +122,7 @@ class Trading:
               '倍;宽容度为：' + str(self.odds * 100) + '%')
         while True:
             self.get_systm_status()
-            time.sleep(300)
+            time.sleep(18000)
 
     # 更新持仓数据
     def update_position(self, data):
@@ -176,6 +176,9 @@ class Trading:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
+        print(
+            '钉钉数据接收监视:', text, "\n", text + '\n作业时间：' +
+            self.timeTamp.get_time_normal(time.time() * 1000) + ' :525')
         text = text + '\n作业时间：' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
@@ -195,9 +198,9 @@ class Trading:
         _step = res['step']  # 策略执行步骤
         id_tamp = kline_data['id_tamp']  # 时间戳
         # 其他数据
-        self.dingding_msg('已完成，步骤：' + str(_step) + '\n,打卡时间：' +
-                          self.timeTamp.get_time_normal(id_tamp) +
-                          ';\n ema240天线: ' + str(indicators['ema240']))
+        self.dingding_msg('完成节点：' + str(_step) + '\n打卡时间：' +
+                          self.timeTamp.get_time_normal(id_tamp) + '\n240均线：' +
+                          str(indicators['ema240']))
         if medium_status and self.buy_times <= 2:
             # 买入 钩子
             self.allBuy()

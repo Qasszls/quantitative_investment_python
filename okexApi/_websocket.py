@@ -84,7 +84,6 @@ class BaseSocketApi:
     # 接收工具
     async def _get_recv(self, websocket, ON_MESSAGE):
         while True:
-            time.sleep(1)
             recv_text = await websocket.recv()
             # 消息处理阶段
             if recv_text != 'pong':
@@ -103,6 +102,7 @@ class BaseSocketApi:
                             self.timeTamp.get_time_normal(time.time() * 1000))
                 else:
                     # print('连接中', recv_text)
+                    self._recv_pong = 'pong'
                     ON_MESSAGE(recv_text)
             else:
                 # print('pong :', recv_text)
