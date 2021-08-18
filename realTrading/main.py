@@ -26,7 +26,7 @@ class Trading:
                  stop_loss,
                  mode=None,
                  odds=0.05,
-                 lever=10,
+                 lever=5,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
@@ -201,7 +201,7 @@ class Trading:
         self.dingding_msg('完成节点：' + str(_step) + '\n打卡时间：' +
                           self.timeTamp.get_time_normal(id_tamp) + '\n240均线：' +
                           str(indicators['ema240']))
-        if medium_status and self.buy_times <= 2:
+        if medium_status and self.buy_times <= 4:
             # 买入 钩子
             self.allBuy()
 
@@ -352,5 +352,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.26, 0.10, user_info=_ulist, mode='loose')
+    trading = Trading(0.24, 0.12, user_info=_ulist, mode='loose')
     trading._init()

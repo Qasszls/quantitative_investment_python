@@ -205,7 +205,7 @@ class SimpleMacd(Strategy):
                 #       'date', self.timeTamp.get_time_normal(med_tamp))
                 return True
         elif self.step == 9999:
-            self._reset()
+            # self._reset()
             self._step_2(todayMacd)
             return False
 
