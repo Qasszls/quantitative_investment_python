@@ -73,8 +73,13 @@ class SimpleMacd(Strategy):
     # 策略运行函数
     def runStrategy(self, data, completed):
         # 第一次进入循环 或者 同一时间的老数据，都会进入
-        if len(self.old_kl) == 0 or data[0] in self.old_kl:
+        if len(self.old_kl) == 0:
             # 其实可以完全不写下面的代码，但是意义就不一样了。
+            self.is_strong_gains = float(data[4]) > float(
+                self.ema240)  # 初始化 股价强势flag
+            self.old_kl = data
+            return
+        if data[0] in self.old_kl:
             self.old_kl = data
             return
         # k线数据
