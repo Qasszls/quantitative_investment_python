@@ -26,7 +26,7 @@ class Trading:
                  stop_loss,
                  mode=None,
                  odds=0.05,
-                 lever=5,
+                 lever=7,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
@@ -176,9 +176,9 @@ class Trading:
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        print(
-            '钉钉数据接收监视:', text, "\n", text + '\n作业时间：' +
-            self.timeTamp.get_time_normal(time.time() * 1000) + ' :525')
+        # print(
+        #     '钉钉数据接收监视:', text, "\n", text + '\n作业时间：' +
+        #     self.timeTamp.get_time_normal(time.time() * 1000) + ' :525')
         text = text + '\n作业时间：' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
@@ -226,7 +226,7 @@ class Trading:
             'tdMode': tdMode,
             'side': action,
             'ordType': ordType,
-            'sz': availBuy * self.lever * 0.50,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+            'sz': availBuy * self.lever * 0.4,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
             'ccy': ccy,
         }
         # 下订单-市价买入
@@ -235,6 +235,7 @@ class Trading:
             self.dingding_msg('买入失败' + str(error))
         else:
             self.dingding_msg('买入成功' + str(res))
+            self.buy_times = self.buy_times + 1
 
     def allSell(self):
         # 获取变量
@@ -252,9 +253,11 @@ class Trading:
         res, err = self.http.close_position(params)
         if err:
             self.dingding_msg('卖出失败，请手动平仓' + str(err))
+            self.buy_times = 0
             return False
         else:
             self.dingding_msg('卖出成功' + str(res))
+            self.buy_times = 0
             return True
 
     # 获取服务器更新节点
@@ -269,10 +272,10 @@ class Trading:
                         self.timeTamp.get_time_normal(item['begin']) +
                         ';\n更新结束时间: ' +
                         self.timeTamp.get_time_normal(item['end']))
-                    print('服务器正在更新中,更新开始时间: ' +
-                          self.timeTamp.get_time_normal(item['begin']) +
-                          ';\n更新结束时间: ' +
-                          self.timeTamp.get_time_normal(item['end']))
+                    # print('服务器正在更新中,更新开始时间: ' +
+                    #       self.timeTamp.get_time_normal(item['begin']) +
+                    #       ';\n更新结束时间: ' +
+                    #       self.timeTamp.get_time_normal(item['end']))
                     # 找出最长更新时间段
                     if _utimes < int(item['end']):
                         _utimes = int(item['end'])
@@ -283,10 +286,10 @@ class Trading:
                         self.timeTamp.get_time_normal(item['begin']) +
                         ';\n更新结束时间: ' +
                         self.timeTamp.get_time_normal(item['end']))
-                    print('服务器有更新计划,更新开始时间: ' +
-                          self.timeTamp.get_time_normal(item['begin']) +
-                          '; 更新结束时间: ' +
-                          self.timeTamp.get_time_normal(item['end']))
+                    # print('服务器有更新计划,更新开始时间: ' +
+                    #       self.timeTamp.get_time_normal(item['begin']) +
+                    #       '; 更新结束时间: ' +
+                    #       self.timeTamp.get_time_normal(item['end']))
         elif error:
             # 网络问题 轮询请求接口，等待网络恢复
             print('get_systm_status 出现问题')
@@ -352,5 +355,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.24, 0.12, user_info=_ulist, mode='loose')
+    trading = Trading(0.28, 0.16, user_info=_ulist, mode='loose')
     trading._init()

@@ -309,22 +309,18 @@ class SimpleMacd(Strategy):
     # 步骤 3 金叉确认 蓄势登场
     def _step_3(self, macdDist):
         """ 死叉 ==> 金叉 ==> 死叉 ==> 金叉 与 背离
-        是否仍在空头市场
-            等待它的金叉状态 next
-        """
-
-        if self._is_under_water(macdDist['dif'], macdDist['dea']):
-            if self._is_golden_cross(macdDist['macd']):
-                if self._is_white_line_up() and self._is_down_channel():
-                    self.step = 9999
-                elif self.mode != 'strict' and self._loose_deviate_from():
-                    self.step = 9999
-                else:
-                    self.step = 2
+            是否仍在空头市场
+                等待它的金叉状态 next
+            """
+        if self._is_golden_cross(macdDist['macd']):
+            if self._is_white_line_up() and self._is_down_channel():
+                self.step = 9999
+            elif self.mode != 'strict' and self._loose_deviate_from():
+                self.step = 9999
             else:
-                self.step = 3
+                self.step = 2
         else:
-            self.step = 0
+            self.step = 3
 
     #背离记录模块 价格与dif
     def price_lowest_record(self, close_price, time_quantum):
