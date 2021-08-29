@@ -209,56 +209,60 @@ class Trading:
     def allBuy(self):
         try:
             result = self._get_trad_sz()
-        except BaseException as err:
-            self.dingding_msg('获得计价货币函数出现问题, 重启函数' + str(err))
-            print('获得计价货币函数出现问题, 重启函数' + str(err))
-        action = 'buy'
-        availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
-        # 获取变量
-        instId = self.okex_api_info['instId']
-        tdMode = self.okex_api_info['tdMode']
-        ordType = self.okex_api_info['ordType']
-        ccy = self.okex_api_info['ccy']
+            action = 'buy'
+            availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
+            # 获取变量
+            instId = self.okex_api_info['instId']
+            tdMode = self.okex_api_info['tdMode']
+            ordType = self.okex_api_info['ordType']
+            ccy = self.okex_api_info['ccy']
 
-        # 配置策略内容
-        params = {
-            'instId': instId,
-            'tdMode': tdMode,
-            'side': action,
-            'ordType': ordType,
-            'sz': availBuy * self.lever * 0.4,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
-            'ccy': ccy,
-        }
-        # 下订单-市价买入
-        res, error = self.http.trade_order(params)
-        if error:
-            self.dingding_msg('买入失败' + str(error))
-        else:
-            self.dingding_msg('买入成功' + str(res))
-            self.buy_times = self.buy_times + 1
+            # 配置策略内容
+            params = {
+                'instId': instId,
+                'tdMode': tdMode,
+                'side': action,
+                'ordType': ordType,
+                'sz': availBuy * self.lever * 0.4,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+                'ccy': ccy,
+            }
+            # 下订单-市价买入
+            res, error = self.http.trade_order(params)
+        except BaseException as err:
+            self.dingding_msg('买入认时出现问题，请注意' + str(err))
+            print('买入时出现问题，请注意' + str(err))
+        finally:
+            if error:
+                self.dingding_msg('买入失败' + str(error))
+            else:
+                self.dingding_msg('买入成功' + str(res))
+                self.buy_times = self.buy_times + 1
 
     def allSell(self):
-        # 获取变量
-        instId = self.okex_api_info['instId']
-        mgnMode = self.okex_api_info['mgnMode']
-        ccy = self.okex_api_info['ccy']
+        try:
+            # 获取变量
+            instId = self.okex_api_info['instId']
+            mgnMode = self.okex_api_info['mgnMode']
+            ccy = self.okex_api_info['ccy']
 
-        # 配置策略内容
-        params = {
-            'instId': instId,
-            'mgnMode': mgnMode,
-            'ccy': ccy,
-        }
-        # 下订单-市价平仓
-        res, err = self.http.close_position(params)
-        if err:
-            self.dingding_msg('卖出失败，请手动平仓' + str(err))
-            self.buy_times = 0
-            return False
-        else:
-            self.dingding_msg('卖出成功' + str(res))
-            self.buy_times = 0
-            return True
+            # 配置策略内容
+            params = {
+                'instId': instId,
+                'mgnMode': mgnMode,
+                'ccy': ccy,
+            }
+            # 下订单-市价平仓
+            res, err = self.http.close_position(params)
+            if err:
+                self.dingding_msg('卖出失败，请手动平仓' + str(err))
+                self.buy_times = 0
+                return False
+            else:
+                self.dingding_msg('卖出成功' + str(res))
+                self.buy_times = 0
+                return True
+        except BaseException as e:
+            print('卖出错误: ', str(e))
 
     # 获取服务器更新节点
     def get_systm_status(self):
@@ -355,5 +359,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.28, 0.16, user_info=_ulist, mode='loose')
+    trading = Trading(0.14, 0.6, user_info=_ulist, mode='loose')
     trading._init()
