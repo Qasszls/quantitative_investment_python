@@ -150,7 +150,7 @@
           "ema26":"176.89",
           "ema240":"173.78",
           "dea":"1.5602",
-          "symbol": "LTC-USDT",
+          "symbol": "BTC-USDT",
           "note":"子账户，用来交易MACD底背离交易策略",
           "trading_type":"1",
           "market_lv":"candle15m",

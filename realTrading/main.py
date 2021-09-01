@@ -26,7 +26,7 @@ class Trading:
                  stop_loss,
                  mode=None,
                  odds=0.05,
-                 lever=7,
+                 lever=10,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
@@ -223,7 +223,7 @@ class Trading:
                 'tdMode': tdMode,
                 'side': action,
                 'ordType': ordType,
-                'sz': availBuy * self.lever * 0.4,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+                'sz': availBuy * self.lever * 0.15,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
                 'ccy': ccy,
             }
             # 下订单-市价买入
@@ -359,5 +359,5 @@ if __name__ == "__main__":
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.14, 0.6, user_info=_ulist, mode='loose')
+    trading = Trading(0.24, 0.6, user_info=_ulist, mode='loose')
     trading._init()
