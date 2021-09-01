@@ -10,6 +10,7 @@ import asyncio
 import re
 import json
 import gc
+import os
 
 sys.path.append('..')
 from dingtalkchatbot.chatbot import DingtalkChatbot
@@ -352,8 +353,8 @@ class Trading:
         }
 
 if __name__ == "__main__":
+    print('我的进程id 是 ',os.getpid())
     # 获取要执行的用户配置
-
     # macd 底背离
     f = open('../config.json', 'r', encoding='utf-8')
     _data = json.load(f)
