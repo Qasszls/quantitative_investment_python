@@ -15,26 +15,19 @@ import os
 sys.path.append('..')
 from dingtalkchatbot.chatbot import DingtalkChatbot
 from util.TimeStamp import TimeTamp
-from strategyLibrary.simpleMACDStrategy import SimpleMacd
+from strategyLibrary.simpleMACDStrategy import StrategyRouter
 from okexApi._websocket import PublicSocketApi
 from okexApi._websocket import PrivateSocketApi
 from okexApi._http import HttpApi
 
 
 class Trading:
-    def __init__(self,
-                 check_surplus,
-                 stop_loss,
-                 mode=None,
-                 odds=0.05,
-                 lever=10,
-                 user_info=None):
+    def __init__(self, check_surplus, stop_loss, lever=10, user_info=None):
         if not user_info:
             print('请填写用户信息')
             return
-
-        self.simpleMacd = SimpleMacd(mode, odds, check_surplus, stop_loss,
-                                     user_info)
+        # 创建币对路由实例
+        self.strategyRouter = StrategyRouter(user_info)
         self.publicSocketApi = PublicSocketApi(on_created=None,
                                                on_message=self._router,
                                                on_closed=self.restart,
@@ -49,19 +42,13 @@ class Trading:
         self.check_surplus = check_surplus  # 玩家止盈率
         self.stop_loss = stop_loss  # 玩家止损率
         self.lever = lever  # 杠杆倍数
-        self.odds = odds  # 宽容度
-        # self.upl = ''  # 未实现收益
-        # self.uplRatio = ''  # 未实现收益率
         # 用户层面
         self._c = 0  # 现金余额 - 默认为USDT
-
         # 内部变量
         self.buy_times = 0
-        # 15m
 
         # 对照字典表
         self.channel_Dict = {
-            'balance_and_position': self.update_position,  # 走 更新持仓信息 函数、
             'positions': self.update_position,  # 走 同上的函数
             "candle": self.breathing,  # 走 行情检测 函数
             'account': self.update_user,  # 走 更新用户信息 函数
@@ -69,24 +56,11 @@ class Trading:
 
         self.okex_api_info = {
             'instType': 'SPOT',  # 产品类型SPOT：币币、SWAP：永续合约、FUTURES：交割合约、OPTION：期权
-            'instId': user_info['symbol'],  # 交易产品 后期可为数组
             'tdMode': 'cross',  # 交易模式
-            # 杠杆部分
             'ccy': 'USDT',  # 保证金币种
-            'lever': self.lever,
             'mgnMode': 'cross',  # 保证金模式 isolated：逐仓、cross：全仓
-            # 策略部分
-            'tpTriggerRate': self.check_surplus,  # 止盈
-            'slTriggerRate': self.stop_loss,  # 止损
-            'ordType':
-            'market',  # 倾向策略方式 conditional：单向止盈止损、oco：双向止盈止损、trigger：计划委托
-            'subscribe': user_info['subscribe'],  # 监听的频道列表
+            'ordType': 'market',  # 订单类型
         }
-
-    # 是否是公共频道
-    def is_public(self, _s):
-        public_subscribe = self.okex_api_info['subscribe']['public']
-        return _s in public_subscribe
 
     # 推送路由
     def _router(self, res):
@@ -98,7 +72,6 @@ class Trading:
             else:
                 print('调用错误')
                 return False
-
     # okex 回调数据
 
         channel = res['arg']['channel']
@@ -106,9 +79,8 @@ class Trading:
         if len(res['data']) == 0:
             return
         else:
-            data = res['data'][0]
             _fun = query(channel)
-            _fun(data)
+            _fun(res)
 
     # 主函数
 
@@ -120,21 +92,25 @@ class Trading:
         self.privateSocketApi.subscription()
         print('主程序已打开，用户止盈率为：' + str(self.check_surplus * 100) + '%; 止损率为：' +
               str(self.stop_loss * 100) + '%; 默认杠杆倍数为：' + str(self.lever) +
-              '倍;宽容度为：' + str(self.odds * 100) + '%')
+              '倍')
         while True:
             self.get_systm_status()
             time.sleep(18000)
 
     # 更新持仓数据
     def update_position(self, data):
-        if data['uplRatio'] != '':
-            uplRatio = float(data['uplRatio'])
+        position = data['data'][0]
+        if position['uplRatio'] != '':
             # 检测止盈止损
-            if self.simpleMacd.runOddsMonitoring(uplRatio):
-                self.allSell()
+            res = self.strategyRouter.isSell(position)
+            if res['status']:
+                self.allSell(res['share'], position['instId'])
 
     # 更新用户数据
     def update_user(self, data):
+        user_info = data['data'][0]
+        return
+
         # 获取用户的USDT的币种余额
         def _get_usdt(_detail):
             for _coin in _detail:
@@ -142,7 +118,7 @@ class Trading:
                     return _coin['cashBal']
             print('未获取到USDT余额')
 
-        _detail = data['details']
+        _detail = user_info['details']
         self._c = _get_usdt(_detail)  # 更新用户的USDT的币种余额
 
     # 重启策略
@@ -157,36 +133,17 @@ class Trading:
             time.sleep(3)
             self.privateSocketApi.subscription()
 
-    # 是服务器的原因 还是 网络的原因
-    # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
-    # 否则如果是私有频道，直接恢复
-    # 不然就执行谨慎的恢复方法
-    # 谨慎的恢复方法为
-    # 材料： 链接中断时的时间戳
-    # 准备1： 根据【链接中断时的时间戳】推断出 链接中断的时间节点
-    # 准备2： 传送【链接中断的时间节点】给服务器，获取目前时间到 该时间节点的所有k线数据
-    # 准备3： 根据k线数据计算每一节点的【量化数据（list）】
-    # 阶段： 在谨慎的恢复方法执行之前
-    # 1.判断主线程与当前服务器时间间隔N（秒），N小于等于30秒的，仍认为当前数据连接中断状态
-    # 2.使用time.sleep方法模拟中断时间，入参为N。
-    # 阶段： 在谨慎的恢复方法执行之中
-    # 1.N秒后遍历【量化数据（list）】并调用breathing方法进行计算与数据落库的工作（争议：在此期间买点、卖点被激活怎么办？）
-    # 2.调用 socket.run 方法重启被中断的链接
-
-    # 策略核心内容
     def dingding_msg(self, text, flag=False):
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
-        # print(
-        #     '钉钉数据接收监视:', text, "\n", text + '\n作业时间：' +
-        #     self.timeTamp.get_time_normal(time.time() * 1000) + ' :525')
         text = text + '\n作业时间：' + self.timeTamp.get_time_normal(
             time.time() * 1000) + ' :525'
         ding.send_text(msg=text, is_at_all=flag)
 
+    # 策略核心内容
     def breathing(self, data):
         # 运行策略 *********** door **************
-        self.simpleMacd.runStrategy(
+        self.strategyRouter.run(
             data,
             self.completed,
         )
@@ -194,29 +151,28 @@ class Trading:
     # 钩子函数 计算完成
     def completed(self, res):
         medium_status = res['medium_status']  # 初级判断状态
-        kline_data = res['kline_data']  # k线数据包
         indicators = res['indicators']  # 指标数据包
         _step = res['step']  # 策略执行步骤
-        id_tamp = kline_data['id_tamp']  # 时间戳
+        id_tamp = res['id_tamp']  # 时间戳
+        instId = res['instId']
         # 其他数据
         self.dingding_msg('完成节点：' + str(_step) + '\n打卡时间：' +
                           self.timeTamp.get_time_normal(id_tamp) + '\n240均线：' +
                           str(indicators['ema240']))
         if medium_status and self.buy_times <= 4:
             # 买入 钩子
-            self.allBuy()
+            self.allBuy(instId)
 
     # 下单
-    def allBuy(self):
+    def allBuy(self, instId):
         try:
-            result = self._get_trad_sz()
-            action = 'buy'
+            result = self._get_trad_sz(instId)
+            # 编辑参数变量
             availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
-            # 获取变量
-            instId = self.okex_api_info['instId']
-            tdMode = self.okex_api_info['tdMode']
-            ordType = self.okex_api_info['ordType']
-            ccy = self.okex_api_info['ccy']
+            action = 'buy'
+            tdMode = self.okex_api_info['tdMode']  # 仓位模式
+            ordType = self.okex_api_info['ordType']  # 订单类型
+            ccy = self.okex_api_info['ccy']  # 保证金比重
 
             # 配置策略内容
             params = {
@@ -239,10 +195,9 @@ class Trading:
                 self.dingding_msg('买入成功' + str(res))
                 self.buy_times = self.buy_times + 1
 
-    def allSell(self):
+    def allSell(self, share, instId):
         try:
             # 获取变量
-            instId = self.okex_api_info['instId']
             mgnMode = self.okex_api_info['mgnMode']
             ccy = self.okex_api_info['ccy']
 
@@ -252,16 +207,18 @@ class Trading:
                 'mgnMode': mgnMode,
                 'ccy': ccy,
             }
+            # 改造成按量下单，而不是强行平仓
+
             # 下订单-市价平仓
-            res, err = self.http.close_position(params)
-            if err:
-                self.dingding_msg('卖出失败，请手动平仓' + str(err))
-                self.buy_times = 0
-                return False
-            else:
-                self.dingding_msg('卖出成功' + str(res))
-                self.buy_times = 0
-                return True
+            # res, err = self.http.close_position(params)
+            # if err:
+            #     self.dingding_msg('卖出失败，请手动平仓' + str(err))
+            #     self.buy_times = 0
+            #     return False
+            # else:
+            #     self.dingding_msg('卖出成功' + str(res))
+            #     self.buy_times = 0
+            #     return True
         except BaseException as e:
             print('卖出错误: ', str(e))
 
@@ -308,18 +265,16 @@ class Trading:
         print('杠杆配置中')
         # 设置杠杆倍数 交易前配置
         instId = self.okex_api_info['instId']
-        lever = self.okex_api_info['lever']
+        lever = self.lever
         mgnMode = self.okex_api_info['mgnMode']
         _s_p = {'instId': instId, 'lever': lever, 'mgnMode': mgnMode}
         self.http.set_account_set_leverage(_s_p)
         print('杠杆配置完毕')
 
-    def _get_trad_sz(self):
-        instId = self.okex_api_info['instId']
+    def _get_trad_sz(self, instId):
         tdMode = self.okex_api_info['tdMode']
         instType = self.okex_api_info['instType']
         ccy = self.okex_api_info['ccy']
-        lever = self.okex_api_info['lever']
         _max_size_params = {
             'instId': instId,
             'tdMode': tdMode,
@@ -353,12 +308,12 @@ class Trading:
         }
 
 if __name__ == "__main__":
-    print('我的进程id 是 ',os.getpid())
+    print('我的进程id 是 ', os.getpid())
     # 获取要执行的用户配置
     # macd 底背离
     f = open('../config.json', 'r', encoding='utf-8')
     _data = json.load(f)
-    _ulist = _data['realPay']['children'][0]
+    user_info = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.24, 0.6, user_info=_ulist, mode='loose')
+    trading = Trading(user_info=user_info['coin_list'])
     trading._init()

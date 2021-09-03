@@ -86,20 +86,22 @@ class SimpleMacd(Strategy):
 
     # 策略运行函数
     def runStrategy(self, data, completed):
+        kline = data['data'][0]
+        instId = data['instId']
         # 第一次进入循环 或者 同一时间的老数据，都会进入
         if len(self.old_kl) == 0:
             # 其实可以完全不写下面的代码，但是意义就不一样了。
-            self.is_strong_gains = float(data[4]) > float(
+            self.is_strong_gains = float(kline[4]) > float(
                 self.ema240)  # 初始化 股价强势flag
-            self.old_kl = data
+            self.old_kl = kline
             return
-        if data[0] in self.old_kl:
-            self.old_kl = data
+        if kline[0] in self.old_kl:
+            self.old_kl = kline
             return
         # k线数据
         KLINE_DATA = self.set_kline_dict(self.old_kl)
         # 取出变量
-        med_tamp = KLINE_DATA['id_tamp']
+        id_tamp = KLINE_DATA['id_tamp']
         close_price = KLINE_DATA['close_price']
         # 指标数据
         INDICATORS_DATA = self._befor_investment(KLINE_DATA)
@@ -107,14 +109,14 @@ class SimpleMacd(Strategy):
         self.monitoring_status(INDICATORS_DATA, KLINE_DATA)
 
         # 核心算法，是否做多，本级别确认
-        medium_status = self.medium_read(close_price, INDICATORS_DATA,
-                                         med_tamp)
-        self.old_kl = data
+        medium_status = self.medium_read(close_price, INDICATORS_DATA, id_tamp)
+        self.old_kl = kline
         completed({
             'medium_status': medium_status,
-            'kline_data': KLINE_DATA,
+            'instId': instId,
             'indicators': INDICATORS_DATA,
             "step": self.step,
+            'id_tamp': id_tamp
         })
 
     # 止盈止损函数
@@ -134,11 +136,11 @@ class SimpleMacd(Strategy):
             if uplRatio > 0:  # 需要止盈
                 if len(self.Lighten_history) > 0:  # 有过止盈历史
                     if self.high_uplRatio and self.high_uplRatio - uplRatio > 0.1:  # 收益是否从高点回落超过 10%
-                        return 0.5  # 减少半仓
+                        return 0.618  # 减少半仓
                     else:
                         return None
                 else:  # 没有止盈历史 减半仓
-                    return 0.5
+                    return 0.382
             else:  # 需要止损
                 return 1
         if self.high_uplRatio < uplRatio:  # 记录收益高点
@@ -377,8 +379,18 @@ class SimpleMacd(Strategy):
                 self.lowest_dif[time_quantum] = dif
 
 
-class router:
-    def __init__(self, coin_list=[]):
+class StrategyRouter:
+    def __init__(self, coin_list):
         self.coin_dict = {}
         for coin in coin_list:
-            SimpleMacd(user_info)
+            # 策略字典里注册一个 策略实例
+            self.coin_dict[coin['symbol']] = SimpleMacd(coin)
+
+    def run(self, data, callback):
+        for item in data:
+            # 获取实例并运行一次策略运算
+            self.coin_dict[item['instId']].runStrategy(item, callback)
+
+    def isSell(self, position):
+        self.coin_dict[position['instId']].runOddsMonitoring(
+            position['uplRatio'])
