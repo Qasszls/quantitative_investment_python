@@ -17,7 +17,6 @@ class Request:
         self._access_key = user_info['access_key']
         self._secret_key = user_info['secret_key']
         self._passphrase = user_info['passphrase']
-        self.trading_type = user_info['trading_type']
 
     # 工具函数
 
@@ -60,8 +59,6 @@ class Request:
 
             if not headers:
                 headers = {}
-            if self.trading_type == '0':
-                headers["x-simulated-trading"] = '1'
             headers["Content-Type"] = "application/json"
             headers["OK-ACCESS-KEY"] = self._access_key
             headers["OK-ACCESS-SIGN"] = sign

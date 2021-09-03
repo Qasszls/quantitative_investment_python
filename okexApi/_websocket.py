@@ -234,7 +234,6 @@ class PrivateSocketApi(BaseSocketApi):
         self.market_lv = user_info['market_lv']
         self.passphrase = user_info['passphrase']
         self.SecretKey = user_info['secret_key']
-        self.trading_type = user_info['trading_type']
 
         self.on_created = on_created
         self.on_message = on_message

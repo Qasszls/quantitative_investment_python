@@ -1,118 +1,4 @@
 {
-  "task_library": [
-    {
-      "table": "2020_kline_1m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "1",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_1m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_3m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "3",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_3m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "3",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_5m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "5",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_5m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "5",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_15m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "15",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_15m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "15",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_30m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "30",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_30m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "30",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    { 
-      "table": "2020_kline_1H",
-      "times": [1609430399000, 1577807999000], 
-      "bar": "1",
-      "_bar_unit": "H",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_1H",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "H",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_1D",
-      "times": [1609430399000, 1577807999000],
-      "bar": "1",
-      "_bar_unit": "D",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_1D",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "D",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_1W",
-      "times": [1609430399000, 1577807999000],
-      "bar": "1",
-      "_bar_unit": "W",
-      "limit": "1"
-    },
-    {
-      "table": "2019_kline_1W",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "W",
-      "limit": "1"
-    }
-  ],
   "filter":["1D"],
   "DBName":"BTC-USDT_kline",
   "platform": "OKEX",
@@ -124,11 +10,9 @@
       "access_key" :"1b8a5361-5ca4-46f9-bc44-e8ca92f5b5be",
       "secret_key" :"B993AADED4E2FAB374DED76C7BF1509B",
       "passphrase" :"ZLS2548120547",
-      "table_name":"realPay_15m",
       "name":"realPay",
       "note":"主账户",
       "market_lv":"candle15m",
-      "trading_type":"1", 
       "ema12":"39177.1",
       "ema26":"39166.2",
       "ema240":"166.22",
@@ -144,20 +28,22 @@
           "access_key" :"cba5d8fc-d233-498c-b18b-5c4f1942eb90",
           "secret_key" :"7DF96F09287EF80869E85C964935E14A",
           "passphrase" :"Zls2548120547",
-          "table_name":"realPay_qassChildrenTwo_15m",
-          "name":"qassChildrenTwo",
-          "ema12":"179.07",
-          "ema26":"176.89",
-          "ema240":"173.78",
-          "dea":"1.5602",
-          "symbol": "LTC-USDT",
-          "note":"子账户，用来交易MACD底背离交易策略",
-          "trading_type":"1",
-          "market_lv":"candle15m",
-          "subscribe": {
-            "private":["positions","account"],
-            "public":["market"]
-          }
+          "coin_list": [
+            {
+              "name":"qassChildrenTwo",
+              "ema12":"179.07",
+              "ema26":"176.89",
+              "ema240":"173.78",
+              "dea":"1.5602",
+              "symbol": "LTC-USDT",
+              "note":"子账户，用来交易MACD底背离交易策略",
+              "market_lv":"candle15m",
+              "subscribe": {
+                "private":["positions","account"],
+                "public":["market"]
+              }
+            }
+          ]
         }
       ]
   },
@@ -166,8 +52,6 @@
       "access_key" :"7dbf6048-5661-4295-9298-d4e9da8b9609",
       "secret_key" :"FB9D1024634A61F8F5F2E376CE10512F",
       "passphrase" :"Zls2548120547",
-      "table_name":"virtualPay_15m",
-      "trading_type":"0",
       "market_lv":"candle15m"
   }
 }

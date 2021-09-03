@@ -45,12 +45,23 @@ class Strategy:
 
 
 class SimpleMacd(Strategy):
-    def __init__(self, mode, odds, check_surplus, stop_loss, user_info):
-        Strategy.__init__(self, check_surplus, stop_loss)
+    def __init__(self, user_info):
+        Strategy.__init__(self, user_info['check_surplus'],
+                          user_info['stop_loss'])
+        # 价格管理
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
-        }
+        }  # 最低价和次低价
+
+        self.high_price = {
+            'first_confirmation': None,
+            'again_confirmation': None
+        }  # 最高价和次高价
+
+        self.high_uplRatio = None
+
+        # 均线管理
         self.lowest_dif = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -66,8 +77,11 @@ class SimpleMacd(Strategy):
         self.dea = float(user_info['dea'])
         self.old_kl = []
 
-        self.mode = mode
-        self.odds = odds
+        #仓位管理
+        self.Lighten_history = []
+
+        self.mode = 'loose'
+        self.odds = 0.05
         self.timeTamp = TimeTamp()
 
     # 策略运行函数
@@ -104,13 +118,32 @@ class SimpleMacd(Strategy):
         })
 
     # 止盈止损函数
-    def runOddsMonitoring(self, uplRatio):
+    def runOddsMonitoring(self, data):
         """
         is_need_sell 是否达成了止盈止损条件 boolean
         is_Strong 当前股价是否强势 boolean
+        减仓路径：
+            止盈减仓：
+                是否达到了止盈位 ===> 止盈50%仓位 ===> 是否有过减仓记录 ===> 从高点回落10% ===> 全清
+            止损减仓：达到止损位 或 跌破低点（未来） 全清
         """
-
+        uplRatio = float(data['uplRatio'])  # 获取未实现收益率
         is_need_sell = self.is_need_sell(uplRatio)
+
+        if is_need_sell:  # 需要减仓
+            if uplRatio > 0:  # 需要止盈
+                if len(self.Lighten_history) > 0:  # 有过止盈历史
+                    if self.high_uplRatio and self.high_uplRatio - uplRatio > 0.1:  # 收益是否从高点回落超过 10%
+                        return 0.5  # 减少半仓
+                    else:
+                        return None
+                else:  # 没有止盈历史 减半仓
+                    return 0.5
+            else:  # 需要止损
+                return 1
+        if self.high_uplRatio < uplRatio:  # 记录收益高点
+            self.high_uplRatio = uplRatio
+
         # 此时股价已经运行在ema240之上
         if self.is_strong_gains:
             return False
@@ -180,6 +213,7 @@ class SimpleMacd(Strategy):
             self.price_lowest_record(close_price, 'first_confirmation')
             self.dif_lowest_record(dif, 'first_confirmation')
             self._step_1(todayMacd)
+            self.high_uplRatio = None
             return False
         elif self.step == 2:
             # 回抽零轴前研判
@@ -341,3 +375,10 @@ class SimpleMacd(Strategy):
         else:
             if dif < self.lowest_dif[time_quantum]:
                 self.lowest_dif[time_quantum] = dif
+
+
+class router:
+    def __init__(self, coin_list=[]):
+        self.coin_dict = {}
+        for coin in coin_list:
+            SimpleMacd(user_info)
