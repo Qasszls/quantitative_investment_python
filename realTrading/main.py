@@ -1,5 +1,11 @@
 # -*- coding:UTF-8 -*-
 
+from okexApi._http import HttpApi
+from okexApi._websocket import PrivateSocketApi
+from okexApi._websocket import PublicSocketApi
+from strategyLibrary.simpleMACDStrategy import SimpleMacd
+from util.TimeStamp import TimeTamp
+from dingtalkchatbot.chatbot import DingtalkChatbot
 import emoji
 import numpy as np
 import pandas as pd
@@ -13,18 +19,10 @@ import gc
 import os
 
 sys.path.append('..')
-from dingtalkchatbot.chatbot import DingtalkChatbot
-from util.TimeStamp import TimeTamp
-from strategyLibrary.simpleMACDStrategy import SimpleMacd
-from okexApi._websocket import PublicSocketApi
-from okexApi._websocket import PrivateSocketApi
-from okexApi._http import HttpApi
 
 
 class Trading:
     def __init__(self,
-                 check_surplus,
-                 stop_loss,
                  mode=None,
                  odds=0.05,
                  lever=10,
@@ -33,8 +31,8 @@ class Trading:
             print('请填写用户信息')
             return
 
-        self.simpleMacd = SimpleMacd( check_surplus, stop_loss,
-                                     user_info)
+        self.simpleMacd = SimpleMacd(
+            user_info)
         self.publicSocketApi = PublicSocketApi(on_created=None,
                                                on_message=self._router,
                                                on_closed=self.restart,
@@ -46,8 +44,8 @@ class Trading:
         self.http = HttpApi(user_info=user_info)  # 初始化短连接
         self.timeTamp = TimeTamp()  # 初始化时间操作对象
 
-        self.check_surplus = check_surplus  # 玩家止盈率
-        self.stop_loss = stop_loss  # 玩家止损率
+        self.check_surplus = float(user_info['check_surplus'])  # 玩家止盈率
+        self.stop_loss = float(user_info['stop_loss'])  # 玩家止损率
         self.lever = lever  # 杠杆倍数
         self.odds = odds  # 宽容度
         # self.upl = ''  # 未实现收益
@@ -304,6 +302,7 @@ class Trading:
 
 # 工具查询---buy/sell阶段-数量
 
+
     def _set_lever(self):
         print('杠杆配置中')
         # 设置杠杆倍数 交易前配置
@@ -352,13 +351,14 @@ class Trading:
             'availSell': _m_s_availSell,
         }
 
+
 if __name__ == "__main__":
-    print('我的进程id 是 ',os.getpid())
+    print('我的进程id 是 ', os.getpid())
     # 获取要执行的用户配置
     # macd 底背离
     f = open('../config.json', 'r', encoding='utf-8')
     _data = json.load(f)
     _ulist = _data['realPay']['children'][0]
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
-    trading = Trading(0.24, 0.6, user_info=_ulist, mode='loose')
+    trading = Trading(user_info=_ulist)
     trading._init()

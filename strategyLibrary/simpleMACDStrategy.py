@@ -45,9 +45,9 @@ class Strategy:
 
 
 class SimpleMacd(Strategy):
-    def __init__(self, check_surplus, stop_loss, user_info):
-        Strategy.__init__(self, check_surplus,
-                          stop_loss)
+    def __init__(self, user_info):
+        Strategy.__init__(self, float(user_info['check_surplus']),
+                          float(user_info['stop_loss']))
         # 价格管理
         self.lowest_price = {
             'first_confirmation': None,
@@ -123,8 +123,6 @@ class SimpleMacd(Strategy):
             止损减仓：达到止损位 或 跌破低点（未来） 全清
         """
         is_need_sell = self.is_need_sell(uplRatio)
-
-  
 
         # 此时股价已经运行在ema240之上
         if self.is_strong_gains:
