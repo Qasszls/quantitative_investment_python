@@ -59,8 +59,6 @@ class SimpleMacd(Strategy):
             'again_confirmation': None
         }  # 最高价和次高价
 
-        self.high_uplRatio = None
-
         # 均线管理
         self.lowest_dif = {
             'first_confirmation': None,
@@ -76,9 +74,6 @@ class SimpleMacd(Strategy):
         self.is_strong_gains = False  # 当前是否强势
         self.dea = float(user_info['dea'])
         self.old_kl = []
-
-        # 仓位管理
-        self.Lighten_history = []
 
         self.mode = 'loose'
         self.odds = 0.05
@@ -129,19 +124,7 @@ class SimpleMacd(Strategy):
         """
         is_need_sell = self.is_need_sell(uplRatio)
 
-        if is_need_sell:  # 需要减仓
-            if uplRatio > 0:  # 需要止盈
-                if len(self.Lighten_history) > 0:  # 有过止盈历史
-                    if self.high_uplRatio and self.high_uplRatio - uplRatio > 0.1:  # 收益是否从高点回落超过 10%
-                        return 0.5  # 减少半仓
-                    else:
-                        return None
-                else:  # 没有止盈历史 减半仓
-                    return 0.5
-            else:  # 需要止损
-                return 1
-        if self.high_uplRatio < uplRatio:  # 记录收益高点
-            self.high_uplRatio = uplRatio
+  
 
         # 此时股价已经运行在ema240之上
         if self.is_strong_gains:
