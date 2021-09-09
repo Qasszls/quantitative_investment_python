@@ -1,7 +1,6 @@
 # -*- coding:UTF-8 -*-
 
-from util.TimeStamp import TimeTamp
-from dingtalkchatbot.chatbot import DingtalkChatbot
+
 import base64
 import hmac
 import sys
@@ -13,6 +12,8 @@ import threading
 import gc
 
 sys.path.append('..')
+from util.TimeStamp import TimeTamp
+from dingtalkchatbot.chatbot import DingtalkChatbot
 
 
 class BaseSocketApi:

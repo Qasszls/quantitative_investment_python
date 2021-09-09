@@ -4,7 +4,6 @@
 1.策略运行函数 runStarategy
 2.止盈止损函数 isSell
 """
-from util.TimeStamp import TimeTamp
 import sys
 import pandas as pd
 import emoji
@@ -14,6 +13,7 @@ import time
 # talib.OBV
 
 sys.path.append('..')
+from util.TimeStamp import TimeTamp
 
 
 class Strategy:

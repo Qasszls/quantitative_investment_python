@@ -1,11 +1,6 @@
 # -*- coding:UTF-8 -*-
 
-from okexApi._http import HttpApi
-from okexApi._websocket import PrivateSocketApi
-from okexApi._websocket import PublicSocketApi
-from strategyLibrary.simpleMACDStrategy import SimpleMacd
-from util.TimeStamp import TimeTamp
-from dingtalkchatbot.chatbot import DingtalkChatbot
+
 import emoji
 import numpy as np
 import pandas as pd
@@ -19,6 +14,12 @@ import gc
 import os
 
 sys.path.append('..')
+from okexApi._http import HttpApi
+from okexApi._websocket import PrivateSocketApi
+from okexApi._websocket import PublicSocketApi
+from strategyLibrary.simpleMACDStrategy import SimpleMacd
+from util.TimeStamp import TimeTamp
+from dingtalkchatbot.chatbot import DingtalkChatbot
 
 
 class Trading:
