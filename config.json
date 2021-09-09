@@ -33,6 +33,8 @@
           "ema26":"46665.1",
           "ema240":"46435.1",
           "dea":"182.484",
+          "check_surplus":"0.24", 
+          "stop_loss":"0.08",
           "symbol": "BTC-USDT",
           "note":"子账户，用来交易MACD底背离交易策略",
           "market_lv":"candle15m",
