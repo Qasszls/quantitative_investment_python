@@ -118,7 +118,7 @@ class SimpleMacd(Strategy):
         })
 
     # 止盈止损函数
-    def runOddsMonitoring(self, data):
+    def runOddsMonitoring(self, uplRatio):
         """
         is_need_sell 是否达成了止盈止损条件 boolean
         is_Strong 当前股价是否强势 boolean
@@ -127,7 +127,6 @@ class SimpleMacd(Strategy):
                 是否达到了止盈位 ===> 止盈50%仓位 ===> 是否有过减仓记录 ===> 从高点回落10% ===> 全清
             止损减仓：达到止损位 或 跌破低点（未来） 全清
         """
-        uplRatio = float(data['uplRatio'])  # 获取未实现收益率
         is_need_sell = self.is_need_sell(uplRatio)
 
         if is_need_sell:  # 需要减仓
