@@ -224,7 +224,7 @@ class Trading:
                 'tdMode': tdMode,
                 'side': action,
                 'ordType': ordType,
-                'sz': availBuy * self.lever * 0.15,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+                'sz': availBuy * self.lever * 0.9,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
                 'ccy': ccy,
             }
             # 下订单-市价买入

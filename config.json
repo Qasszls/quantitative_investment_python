@@ -31,11 +31,11 @@
           "coin_list": [
             {
               "name":"qassChildrenTwo",
-              "ema12":"179.07",
-              "ema26":"176.89",
-              "ema240":"173.78",
-              "dea":"1.5602",
-              "symbol": "LTC-USDT",
+              "ema12":"46854.3",
+              "ema26":"46665.1",
+              "ema240":"46435.1",
+              "dea":"182.484",
+              "symbol": "BTC-USDT",
               "note":"子账户，用来交易MACD底背离交易策略",
               "market_lv":"candle15m",
               "subscribe": {

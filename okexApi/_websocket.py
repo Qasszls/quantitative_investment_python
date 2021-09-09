@@ -1,5 +1,6 @@
 # -*- coding:UTF-8 -*-
 
+from util.TimeStamp import TimeTamp
 from dingtalkchatbot.chatbot import DingtalkChatbot
 import base64
 import hmac
@@ -12,7 +13,6 @@ import threading
 import gc
 
 sys.path.append('..')
-from util.TimeStamp import TimeTamp
 
 
 class BaseSocketApi:
@@ -25,12 +25,17 @@ class BaseSocketApi:
 
     # 方法总入口
     def run(self, ON_CREATED, ON_MESSAGE, ON_CLOSED):
-        # 获取一个跑起异步协程的子线程
-        ws_loop = self._get_thred_loop('---' + self.name + '---')
-        # 扔到对应线程异步里去
-        self._task = asyncio.run_coroutine_threadsafe(
-            self.link_websocket(ws_loop, ON_CREATED, ON_MESSAGE, ON_CLOSED),
-            ws_loop)
+        try:
+            # 获取一个跑起异步协程的子线程
+            ws_loop = self._get_thred_loop('---' + self.name + '---')
+            # 扔到对应线程异步里去
+            self._task = asyncio.run_coroutine_threadsafe(
+                self.link_websocket(ws_loop, ON_CREATED,
+                                    ON_MESSAGE, ON_CLOSED),
+                ws_loop)
+        except BaseException as err:
+            print('线程建立出现问题,', self.name, str(err))
+            self._restart_link(ws_loop, ON_CLOSED)
 
     # 连接 websocket
     async def link_websocket(self, ws_loop, ON_CREATED, ON_MESSAGE, ON_CLOSED):
@@ -61,7 +66,7 @@ class BaseSocketApi:
         # 如果 链接打开着
         try:
             while True:
-                time.sleep(25)
+                time.sleep(30)
                 gc.collect()
                 if websocket.state.name == "OPEN":
                     if self._recv_pong == 'pong':
@@ -143,7 +148,7 @@ class BaseSocketApi:
         # 获取loop对象
         def get_loop():
             # 运行事件循环
-            new_loop = asyncio.new_event_loop()  #在当前线程下创建时间循环，（未启用）
+            new_loop = asyncio.new_event_loop()  # 在当前线程下创建时间循环，（未启用）
             return new_loop
 
         # 在一个新线程中启动loop
@@ -158,7 +163,7 @@ class BaseSocketApi:
 
             t = threading.Thread(target=_start_loop,
                                  name=name + "Thread",
-                                 args=(new_loop, ))  #通过当前线程开启新的线程去启动事件循环
+                                 args=(new_loop, ))  # 通过当前线程开启新的线程去启动事件循环
             t.start()
 
         new_loop = get_loop()  # 获取一个异步轮询对象
