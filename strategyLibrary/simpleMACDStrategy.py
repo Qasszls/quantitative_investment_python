@@ -4,6 +4,7 @@
 1.策略运行函数 runStarategy
 2.止盈止损函数 isSell
 """
+from util.TimeStamp import TimeTamp
 import sys
 import pandas as pd
 import emoji
@@ -13,7 +14,6 @@ import time
 # talib.OBV
 
 sys.path.append('..')
-from util.TimeStamp import TimeTamp
 
 
 class Strategy:
@@ -45,9 +45,9 @@ class Strategy:
 
 
 class SimpleMacd(Strategy):
-    def __init__(self, user_info):
-        Strategy.__init__(self, user_info['check_surplus'],
-                          user_info['stop_loss'])
+    def __init__(self, check_surplus, stop_loss, user_info):
+        Strategy.__init__(self, check_surplus,
+                          stop_loss)
         # 价格管理
         self.lowest_price = {
             'first_confirmation': None,
@@ -77,7 +77,7 @@ class SimpleMacd(Strategy):
         self.dea = float(user_info['dea'])
         self.old_kl = []
 
-        #仓位管理
+        # 仓位管理
         self.Lighten_history = []
 
         self.mode = 'loose'
@@ -257,7 +257,7 @@ class SimpleMacd(Strategy):
     def _is_golden_cross(self, macd):
         return macd > 0
 
-    #非严格模式的 白线收盘价是否背离
+    # 非严格模式的 白线收盘价是否背离
     def _loose_deviate_from(self):
         odds = self.odds
 
@@ -361,7 +361,7 @@ class SimpleMacd(Strategy):
         else:
             self.step = 3
 
-    #背离记录模块 价格与dif
+    # 背离记录模块 价格与dif
     def price_lowest_record(self, close_price, time_quantum):
         if self.lowest_price[time_quantum] == None:
             self.lowest_price[time_quantum] = close_price
@@ -375,10 +375,3 @@ class SimpleMacd(Strategy):
         else:
             if dif < self.lowest_dif[time_quantum]:
                 self.lowest_dif[time_quantum] = dif
-
-
-class router:
-    def __init__(self, coin_list=[]):
-        self.coin_dict = {}
-        for coin in coin_list:
-            SimpleMacd(user_info)

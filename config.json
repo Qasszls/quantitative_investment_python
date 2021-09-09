@@ -28,22 +28,18 @@
           "access_key" :"cba5d8fc-d233-498c-b18b-5c4f1942eb90",
           "secret_key" :"7DF96F09287EF80869E85C964935E14A",
           "passphrase" :"Zls2548120547",
-          "coin_list": [
-            {
-              "name":"qassChildrenTwo",
-              "ema12":"46854.3",
-              "ema26":"46665.1",
-              "ema240":"46435.1",
-              "dea":"182.484",
-              "symbol": "BTC-USDT",
-              "note":"子账户，用来交易MACD底背离交易策略",
-              "market_lv":"candle15m",
-              "subscribe": {
-                "private":["positions","account"],
-                "public":["market"]
-              }
-            }
-          ]
+          "name":"qassChildrenTwo",
+          "ema12":"46854.3",
+          "ema26":"46665.1",
+          "ema240":"46435.1",
+          "dea":"182.484",
+          "symbol": "BTC-USDT",
+          "note":"子账户，用来交易MACD底背离交易策略",
+          "market_lv":"candle15m",
+          "subscribe": {
+            "private":["positions","account"],
+            "public":["market"]
+          }
         }
       ]
   },

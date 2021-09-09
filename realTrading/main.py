@@ -33,7 +33,7 @@ class Trading:
             print('请填写用户信息')
             return
 
-        self.simpleMacd = SimpleMacd(mode, odds, check_surplus, stop_loss,
+        self.simpleMacd = SimpleMacd( check_surplus, stop_loss,
                                      user_info)
         self.publicSocketApi = PublicSocketApi(on_created=None,
                                                on_message=self._router,
