@@ -26,7 +26,6 @@ class Trading:
     def __init__(self,
                  mode=None,
                  odds=0.05,
-                 lever=10,
                  user_info=None):
         if not user_info:
             print('请填写用户信息')
@@ -47,7 +46,8 @@ class Trading:
 
         self.check_surplus = float(user_info['check_surplus'])  # 玩家止盈率
         self.stop_loss = float(user_info['stop_loss'])  # 玩家止损率
-        self.lever = lever  # 杠杆倍数
+        self.lever = float(user_info['lever'])  # 杠杆倍数
+        self.singleTradePosition=user_info['singleTradePosition']
         self.odds = odds  # 宽容度
         # self.upl = ''  # 未实现收益
         # self.uplRatio = ''  # 未实现收益率
@@ -201,7 +201,7 @@ class Trading:
         self.dingding_msg('完成节点：' + str(_step) + '\n打卡时间：' +
                           self.timeTamp.get_time_normal(id_tamp) + '\n240均线：' +
                           str(indicators['ema240']))
-        if medium_status and self.buy_times <= 4:
+        if medium_status and self.buy_times <= 1:
             # 买入 钩子
             self.allBuy()
 
@@ -211,7 +211,7 @@ class Trading:
             result = self._get_trad_sz()
             action = 'buy'
             availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
-            # 获取变量
+            # 获取变
             instId = self.okex_api_info['instId']
             tdMode = self.okex_api_info['tdMode']
             ordType = self.okex_api_info['ordType']
@@ -223,7 +223,7 @@ class Trading:
                 'tdMode': tdMode,
                 'side': action,
                 'ordType': ordType,
-                'sz': availBuy * self.lever * 0.9,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+                'sz': availBuy * self.lever * self.singleTradePosition,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
                 'ccy': ccy,
             }
             # 下订单-市价买入

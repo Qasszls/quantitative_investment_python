@@ -79,7 +79,7 @@ class BaseSocketApi:
                     raise Exception('websocket已关闭')
 
         except BaseException as err:
-            print('心跳函数抛出异常', str(err))
+            print('心跳函数抛出异常'+self.name, str(err))
         finally:
             # 关闭 websocket 停下 loop循环 run_coroutine_threadsafe
             if websocket and websocket.state.name == 'OPEN' and not websocket.closed:
@@ -89,6 +89,7 @@ class BaseSocketApi:
 
     # 接收工具
     async def _get_recv(self, websocket, ON_MESSAGE):
+        print('开启接收工具')
         while True:
             recv_text = await websocket.recv()
             # 消息处理阶段
@@ -106,6 +107,7 @@ class BaseSocketApi:
                         print(
                             '订阅', recv_text['arg']['channel'], '成功',
                             self.timeTamp.get_time_normal(time.time() * 1000))
+                        self._recv_pong = 'pong'
                 else:
                     # print('连接中', recv_text)
                     self._recv_pong = 'pong'
