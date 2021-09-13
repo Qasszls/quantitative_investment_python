@@ -195,7 +195,10 @@ class Trading:
         # 其他数据
         self.dingding_msg('完成节点：' + str(_step) + '\n打卡时间：' +
                           self.timeTamp.get_time_normal(id_tamp) + '\n240均线：' +
-                          str(indicators['ema240']))
+                          str(indicators['ema240']) + '\n26均线：' +
+                          str(indicators['ema26']) + '\n12均线：' +
+                          str(indicators['ema12']) + '\ndea均线：' +
+                          str(indicators['dea']))
         if medium_status and self.buy_times <= 1:
             # 买入 钩子
             self.allBuy()
