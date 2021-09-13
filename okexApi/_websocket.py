@@ -75,9 +75,10 @@ class BaseSocketApi:
                         await self._do_send(websocket, 'ping')
                     else:
                         raise Exception('ws服务器已经断开连接')
-                else:
+                elif websocket.state.name == "CLOSE":
                     raise Exception('websocket已关闭')
-
+                else:
+                    print('长链接状态：',websocket.state.name,'link_name：',self.name )
         except BaseException as err:
             print('心跳函数抛出异常'+self.name, str(err))
         finally:

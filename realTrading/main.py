@@ -82,11 +82,6 @@ class Trading:
             'subscribe': user_info['subscribe'],  # 监听的频道列表
         }
 
-    # 是否是公共频道
-    def is_public(self, _s):
-        public_subscribe = self.okex_api_info['subscribe']['public']
-        return _s in public_subscribe
-
     # 推送路由
     def _router(self, res):
         def query(channel):
