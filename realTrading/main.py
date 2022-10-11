@@ -1,6 +1,6 @@
 # -*- coding:UTF-8 -*-
 
-from dingtalkchatbot.chatbot import DingtalkChatbot
+# from dingtalkchatbot.chatbot import DingtalkChatbot
 import pandas as pd
 import numpy as np
 import emoji
@@ -12,7 +12,7 @@ import re
 import json
 import gc
 
-sys.path.append('..')
+sys.path.append('/Volumes/code/quant/quantitative_investment_python/')
 from util.TimeStamp import TimeTamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from okexApi._websocket import PublicSocketApi
@@ -34,13 +34,13 @@ class Trading:
 
         self.simpleMacd = SimpleMacd(mode, odds)
         self.publicSocketApi = PublicSocketApi(on_created=None,
-                                               on_message=self._router,
+                                               on_message=self.dataRouter,
                                                on_closed=self.restart,
                                                user_info=user_info)  # 初始化长连接
-        self.privateSocketApi = PrivateSocketApi(on_created=None,
-                                                 on_message=self._router,
-                                                 on_closed=self.restart,
-                                                 user_info=user_info)  # 初始化长连接
+        # self.privateSocketApi = PrivateSocketApi(on_created=None,
+        #                                          on_message=self.dataRouter,
+        #                                          on_closed=self.restart,
+        #                                          user_info=user_info)  # 初始化长连接
         self.http = HttpApi(user_info=user_info)  # 初始化短连接
         self.timeTamp = TimeTamp()  # 初始化时间操作对象
 
@@ -91,7 +91,7 @@ class Trading:
         return _s in public_subscribe
 
     # 推送路由
-    def _router(self, res):
+    def dataRouter(self, res):
         def query(channel):
             if channel in self.channel_Dict:
                 return self.channel_Dict[channel]
@@ -102,7 +102,8 @@ class Trading:
                 return False
 
     # okex 回调数据
-
+        res = json.loads(res[0])
+        print(res)
         channel = res['arg']['channel']
         # 如果回调数据 data长度为0，说明暂无数据，调用无效
         if len(res['data']) == 0:
@@ -118,14 +119,14 @@ class Trading:
         # 配置杠杆
         self._set_lever()
         #配置私有公有链接的频道
-        self.publicSocketApi.subscription()
-        self.privateSocketApi.subscription()
+        self.publicSocketApi.run()
+        # self.privateSocketApi.run()
         print('主程序已打开，用户止盈率为：' + str(self.checkSurplus * 100) + '%; 止损率为：' +
               str(self.stopLoss * 100) + '%; 默认杠杆倍数为：' + str(self.lever) +
               '倍;宽容度为：' + str(self.odds * 100) + '%')
-        while True:
-            self.get_systm_status()
-            time.sleep(10)
+        # while True:
+        #     self.get_systm_status()
+        #     time.sleep(10)
 
     # 更新持仓数据
     def update_position(self, data):
@@ -157,25 +158,25 @@ class Trading:
 
     # 重启策略
     def restart(self, _res):
-        while True:
-            time.sleep(20)
-            _ntamp = time.time() * 1000
-            if self.update_times > _ntamp:
-                print('睡眠中', (self.update_times - _ntamp) / 1000, '秒')
-                self.dingding_msg('睡眠中' +
-                                  str((self.update_times - _ntamp) / 1000) +
-                                  '秒')
-            else:
-                break
-        name = _res['data']
-        print(name + '新家园建立')
-        if name == 'public':
-            time.sleep(3)
-            self.publicSocketApi.subscription()
+        # while True:
+        #     time.sleep(20)
+        #     _ntamp = time.time() * 1000
+        #     if self.update_times > _ntamp:
+        #         print('睡眠中', (self.update_times - _ntamp) / 1000, '秒')
+        #         self.dingding_msg('睡眠中' +
+        #                           str((self.update_times - _ntamp) / 1000) +
+        #                           '秒')
+        #     else:
+        #         break
+        # name = _res['data']
+        print('正在重启策略')
+        # if name == 'public':
+        #     time.sleep(3)
+        #     self.publicSocketApi.subscription()
 
-        else:
-            time.sleep(3)
-            self.privateSocketApi.subscription()
+        # else:
+        #     time.sleep(3)
+        #     self.privateSocketApi.subscription()
 
     # 是服务器的原因 还是 网络的原因
     # 是服务器的原因 请求服务器获取服务器时间，根据服务器时间计算出恢复时间点，在其后五秒执行恢复方法
@@ -195,6 +196,7 @@ class Trading:
 
     # 策略核心内容
     def dingding_msg(self, text, flag=False):
+        return
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         ding = DingtalkChatbot(webhook)
         text = text + '  作业时间：' + self.timeTamp.get_time_normal(
@@ -434,9 +436,9 @@ if __name__ == "__main__":
     # 获取要执行的用户配置
 
     # macd 底背离
-    f = open('../config.json', 'r', encoding='utf-8')
+    f = open('config.json', 'r', encoding='utf-8')
     _data = json.load(f)
-    _ulist = _data['realPay']['children'][0]
+    _ulist = _data['realPay']
     # 止盈率:5%, 止损率:2%, 测试账户:主账户, 策略运行模式:宽松。
     trading = Trading(0.16, 0.08, user_info=_ulist, mode='loose')
     trading._init()

@@ -115,15 +115,12 @@
   ],
   "filter":["1D"],
   "DBName":"BTC-USDT_kline",
-  "platform": "OKEX",
   "symbol": "BTC-USDT",
-  "kline_interval": "1m",
-  "strategy_name": "double_ma_strategy",
   "realPay":{
       "host":"https://www.okex.com",
-      "access_key" :"1b8a5361-5ca4-46f9-bc44-e8ca92f5b5be",
-      "secret_key" :"B993AADED4E2FAB374DED76C7BF1509B",
-      "passphrase" :"ZLS2548120547",
+      "access_key" :"bdedd431-4ee7-494b-b539-cc10f1a1cdef",
+      "secret_key" :"7619D4450F512E462CEE4C0579E083F3",
+      "passphrase" :"Qass-utf-8", 
       "table_name":"realPay_15m",
       "name":"realPay",
       "note":"主账户",
@@ -136,36 +133,6 @@
       "subscribe": {
         "private":["positions","account"],
         "public":["market"]
-      },
-      "children":[
-        {
-          "host":"https://www.okex.com",
-          "access_key" :"cba5d8fc-d233-498c-b18b-5c4f1942eb90",
-          "secret_key" :"7DF96F09287EF80869E85C964935E14A",
-          "passphrase" :"Zls2548120547",
-          "table_name":"realPay_qassChildrenTwo_15m",
-          "name":"qassChildrenTwo",
-          "ema12":"162.99",
-          "ema26":"163.41",
-          "dea":"-0.55",
-          "symbol": "LTC-USDT",
-          "note":"子账户，用来交易MACD底背离交易策略",
-          "trading_type":"1",
-          "market_lv":"candle15m",
-          "subscribe": {
-            "private":["positions","account"],
-            "public":["market"]
-          }
-        }
-      ]
-  },
-  "virtualPay":{
-      "host":"https://www.okex.com",
-      "access_key" :"7dbf6048-5661-4295-9298-d4e9da8b9609",
-      "secret_key" :"FB9D1024634A61F8F5F2E376CE10512F",
-      "passphrase" :"Zls2548120547",
-      "table_name":"virtualPay_15m",
-      "trading_type":"0",
-      "market_lv":"candle15m"
+      }
   }
 }
