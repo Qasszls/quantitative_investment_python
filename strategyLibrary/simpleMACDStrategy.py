@@ -47,22 +47,23 @@ for item in kline:
     # 止盈 大于当前价格 22%
     
 """
+from util.TimeStamp import TimeTamp
 from os import close
 import sys
 # import talib
 import pandas as pd
 import emoji
-
+from events.engine import Event
+from events.event import EVENT_CALCULATE, EVENT_COMPUTED
 import time
 
 # talib.OBV
 
 sys.path.append('..')
-from util.TimeStamp import TimeTamp
 
 
 class SimpleMacd():
-    def __init__(self, mode, odds):
+    def __init__(self, odds, event_engine):
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -72,28 +73,34 @@ class SimpleMacd():
             'again_confirmation': None
         }
         self.step = 0
-        self.mode = mode
         self.odds = odds
+        self.event_engine = event_engine
         self.timeTamp = TimeTamp()
 
-    def runStrategy(self, kline_data, macd_data, onCalculate, completed):
+    def on_event(self, event: Event):
+        self.event_engine.put(event)
+
+    def runStrategy(self, kline_data, macd_data):
         med_tamp = kline_data['id_tamp']
         close_price = kline_data['close_price']
         # 计算中 钩子
-        onCalculate({
+        event = Event(EVENT_CALCULATE, {
             'close_price': close_price,
             'id_tamp': med_tamp,
         })
+        self.on_event(event)
 
         # 核心算法，是否做多，本级别确认
         medium_status = self.medium_read(close_price, macd_data, med_tamp)
         # 实例化核心算法对象----高级别
-        completed({
+
+        event = Event(EVENT_COMPUTED, {
             'medium_status': medium_status,
             'kline_data': kline_data,
             'macd_data': macd_data,
             "step": self.step
         })
+        self.on_event(event)
 
     # 本级别研判
     def medium_read(self, close_price, todayMacd, med_tamp):
@@ -152,7 +159,7 @@ class SimpleMacd():
     def _is_golden_cross(self, macd):
         return macd > 0
 
-    #非严格模式的 白线收盘价是否背离
+    # 非严格模式的 白线收盘价是否背离
     def _loose_deviate_from(self):
         odds = self.odds
 
@@ -251,7 +258,7 @@ class SimpleMacd():
             if self._is_golden_cross(macdDist['macd']):
                 if self._is_white_line_up() and self._is_down_channel():
                     self.step = 9999
-                elif self.mode != 'strict' and self._loose_deviate_from():
+                elif self._loose_deviate_from():
                     self.step = 9999
                 else:
                     self.step = 2
@@ -260,7 +267,7 @@ class SimpleMacd():
         else:
             self.step = 0
 
-    #背离记录模块 价格与dif
+    # 背离记录模块 价格与dif
     def price_lowest_record(self, close_price, time_quantum):
         if self.lowest_price[time_quantum] == None:
             self.lowest_price[time_quantum] = close_price

@@ -1,27 +1,32 @@
 # -*- coding:UTF-8 -*-
 
+from events.event import EVENT_TICK, EVENT_LOGIN, EVENT_ERROR, EVENT_POSITION, EVENT_ACCOUNT
+from events.engine import Event, EventEngine
 from util.TimeStamp import TimeTamp
-# from dingtalkchatbot.chatbot import DingtalkChatbot
 import base64
 import hmac
 import sys
 import time
 import websocket
 import json
+from threading import Thread
+sys.path.append('okexApi')
 
-sys.path.append('..')
 
 PUB_URL = "wss://ws.okx.com:8443/ws/v5/public"
 PRI_URL = "ws://ws.okx.com:8443/ws/v5/private"
 
 
 class BaseSocketApi:
-    def __init__(self):
-        None
+    def __init__(self, ws):
+        self.ws = ws
 
-    # 订阅函数
+    # 订阅频道 subscribe
+    def add_channel(self, args):
+        self._get_base('subscribe', args)
 
-    def _get_base(self, ws, op='subscribe', args=None):
+    # 推送信息
+    def _get_base(self, op='subscribe', args=None):
         _a = []
         # 编辑args
         if isinstance(args, list):
@@ -36,54 +41,72 @@ class BaseSocketApi:
             return
         # 发送订阅
         _s = {'op': op, 'args': _a}
-        ws.send(json.dumps(_s))
+        self.ws.send(json.dumps(_s))
 
 
 class PublicSocketApi(BaseSocketApi):
-    def __init__(self, on_created, on_message, on_closed, user_info):
-
-        BaseSocketApi.__init__(self)
-
-        self.market_lv = user_info['market_lv']
-        self.symbol = user_info['symbol']
-# 下面的内容后期都换成事件驱动的
-        self.on_created = on_created
-        self.on_message = on_message
-        self.on_closed = on_closed
-
-    # 启动公有链接
-    def run(self):
+    def __init__(self, event_engine: EventEngine, user_info):
+        self.thread: Thread = Thread(target=self.run)
         ws = websocket.WebSocketApp(PUB_URL,
                                     on_open=self.ON_OPEN,
                                     on_message=self.ON_MESSAGE,
                                     on_error=self.ON_ERROR,
                                     on_close=self.ON_CLOSED)
-        # ws.run_forever(ping_interval=30, ping_timeout=10, proxy_type="socks5",
-        #                http_proxy_host='127.0.0.1', http_proxy_port='10000')
-        ws.run_forever(http_proxy_host="127.0.0.1",
-                       http_proxy_port=10000, proxy_type='socks5')
+        BaseSocketApi.__init__(self, ws)
+
+        self.ws = ws
+        self.user_info = user_info
+        self.event_engine = event_engine
+
+    # 启动公有链接
+    def run(self):
+        self.ws.run_forever(http_proxy_host="127.0.0.1",
+                            http_proxy_port=10000, proxy_type='socks5')
+
+    # 打开常链接线程
+    def start(self):
+        self.thread.start()
+
+    # 关闭长链接线程
+    def close(self):
+        self.ws.close()
+        self.thread.join()
 
     # 生命周期函数 再包装
-
     def ON_OPEN(self, ws):
-        self._get_base(
-            ws, args={"channel": self.market_lv, "instId": self.symbol})
-        if self.on_created:
-            self.on_created()
+        # 订阅默认频道
+        self.add_channel(
+            {"channel": self.user_info['market_lv'], "instId": self.user_info['symbol']})
 
     def ON_MESSAGE(self, ws, *arg):
-        self.on_message(arg)
+        # 如果有event字段，代表是服务器订阅回推内容，不予处理
+        okx_data = json.loads(arg[0])
+        if('event' not in okx_data):
+            event = Event(EVENT_TICK, okx_data)
+            self.event_engine.put(event)
 
     def ON_CLOSED(self, ws, *arg):
         print('ON_CLOSED')
-        self.on_closed(arg)
 
-    def ON_ERROR(self, ws, *args):
-        print('ws 公共链接出错', args)
+    def ON_ERROR(self, ws, *error):
+        global reconnect_count
+        if type(error) == ConnectionRefusedError or type(
+                error
+        ) == websocket._exceptions.WebSocketConnectionClosedException:
+            print("正在尝试第%d次重连" % reconnect_count)
+            reconnect_count += 1
+            if reconnect_count < 100:
+                self.run()
+                time.sleep(2)
+        else:
+            print("其他error!")
+            print(error)
 
 
 class PrivateSocketApi(BaseSocketApi):
-    def __init__(self, on_created, on_message, on_closed, user_info):
+    def __init__(self, event_engine: EventEngine, user_info):
+
+        self.thread: Thread = Thread(target=self.run)
 
         BaseSocketApi.__init__(self)
 
@@ -93,42 +116,75 @@ class PrivateSocketApi(BaseSocketApi):
         self.SecretKey = user_info['secret_key']
         self.trading_type = user_info['trading_type']
 
-        self.on_created = on_created
-        self.on_message = on_message
-        self.on_closed = on_closed
+        self.event_engine = event_engine
+        self.ws = ''
 
     # 启动私有链接
     def run(self):
-        ws = websocket.WebSocketApp(PRI_URL,
-                                    on_open=self.ON_OPEN,
-                                    on_message=self.ON_MESSAGE,
-                                    on_error=self.ON_ERROR,
-                                    on_close=self.ON_CLOSED)
-        ws.run_forever(ping_interval=30, ping_timeout=10)
+        self.ws = websocket.WebSocketApp(PRI_URL,
+                                         on_open=self.ON_OPEN,
+                                         on_message=self.ON_MESSAGE,
+                                         on_error=self.ON_ERROR,
+                                         on_close=self.ON_CLOSED)
+        self.ws.run_forever(http_proxy_host="127.0.0.1",
+                            http_proxy_port=10000, proxy_type='socks5')
+
+    # 打开常链接线程
+    def start(self):
+        self.thread.start()
+
+    # 关闭长链接线程
+    def close(self):
+        self.ws.close()
+        self.thread.join()
 
     # 生命周期函数
+    def ON_OPEN(self, ws):
+        self.login(ws)
 
-    async def ON_OPEN(self, ws):
-        status = await self.login(ws)
-        if not status:
-            raise Exception('登录出错')
-        await self._positions(ws)
-        await self._account(ws)
-        if self.on_created:
-            self.on_created()
+    def ON_MESSAGE(self, ws, *arg):
+        recv_text = json.loads(arg[0])
+        event_data = ''
+        event_name = ''
+        # 处理订阅返回的消息
+        if 'event' in recv_text:
+            if recv_text['event'] == 'error':
+                event_data = '私有频道订阅出错，错误码为：' + recv_text['code']
+                event_name = EVENT_ERROR
+            elif recv_text['event'] == 'login':
+                event_data = recv_text['code'] == 0
+                event_name = EVENT_LOGIN
+            elif 'event' not in recv_text:
+                # 处理推送消息
+                if recv_text['arg']['channel'] == 'account':
+                    event_data = recv_text['data']
+                    event_name = EVENT_ACCOUNT
+                elif recv_text['arg']['channel'] == 'positions':
+                    event_data = recv_text['data']
+                    event_name = EVENT_POSITION
 
-    def ON_MESSAGE(self, ws, res):
-        self.on_message(res)
+        event = Event(event_name, event_data)
+        self.event_engine.put(event)
 
     def ON_CLOSED(self, ws, res):
-        self.on_closed(res)
+        print('私有链接已经关闭')
 
-    def ON_ERROR(self, ws, *args):
-        print('ws 公共链接出错')
+    def ON_ERROR(self, ws, *error):
+        global reconnect_count
+        if type(error) == ConnectionRefusedError or type(
+                error
+        ) == websocket._exceptions.WebSocketConnectionClosedException:
+            print("正在尝试第%d次重连" % reconnect_count)
+            reconnect_count += 1
+            if reconnect_count < 100:
+                self.run()
+                time.sleep(2)
+        else:
+            print("其他error!")
+            print(error)
 
     # 订阅 登录
-
-    async def login(self, _w):
+    def login(self, _w):
         timestamp = (str(time.time()).split(".")[0])
 
         # 私有函数
@@ -150,18 +206,9 @@ class PrivateSocketApi(BaseSocketApi):
         args['timestamp'] = timestamp
         args['sign'] = _get_sign()
 
-        await self._get_base(_w, op='login', args=args)
+        self._get_base(_w, op='login', args=args)
 
-        recv_text = json.loads(await _w.recv())
-        # 成功或失败推送处理
-        if 'event' in recv_text:
-            if recv_text['event'] == 'error':
-                print('登录出错，错误码为：' + recv_text['code'])
-                return False
-            else:
-                if recv_text['code'] == '0':
-                    return True
-
+    
     # 订阅持仓频道-私有
     async def _positions(self, _w):
         await self._get_base(_w,
