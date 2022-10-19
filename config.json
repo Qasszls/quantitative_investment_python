@@ -118,7 +118,7 @@
   "symbol": "BTC-USDT",
   "realPay":{
       "host":"https://www.okex.com",
-      "access_key" :"bdedd431-4ee7-494b-b539-cc10f1a1cdef",
+      "api_key" :"bdedd431-4ee7-494b-b539-cc10f1a1cdef",
       "secret_key" :"7619D4450F512E462CEE4C0579E083F3",
       "passphrase" :"Qass-utf-8", 
       "table_name":"realPay_15m",

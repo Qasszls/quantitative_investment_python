@@ -7,7 +7,7 @@ import emoji
 import numpy as np
 import pandas as pd
 
-from util.TimeStamp import TimeTamp
+from share.TimeStamp import TimeTamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from events.engine import EventEngine
 from events.event import EVENT_TICK, EVENT_POSITION, EVENT_CALCULATE, EVENT_COMPUTED

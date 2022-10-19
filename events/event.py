@@ -15,8 +15,6 @@ EVENT_QUOTE = "eQuote."
 EVENT_CONTRACT = "eContract." # 合约
 EVENT_LOG = "eLog"
 
-EVENT_LOGIN = "eLogin."
-
 # 策略运行事件
 EVENT_CALCULATE = 'eCalculate'
 EVENT_COMPUTED = 'eComputed'

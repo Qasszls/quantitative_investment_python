@@ -47,7 +47,7 @@ for item in kline:
     # 止盈 大于当前价格 22%
     
 """
-from util.TimeStamp import TimeTamp
+from share.TimeStamp import TimeTamp
 from os import close
 import sys
 # import talib

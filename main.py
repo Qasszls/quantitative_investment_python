@@ -3,7 +3,7 @@ import json
 import time
 import emoji
 from trading.engine import Trading
-from util.TimeStamp import TimeTamp
+from share.TimeStamp import TimeTamp
 from okexApi.websocket import OkxExchange
 from okexApi._http import HttpApi
 from events.engine import EventEngine
@@ -35,9 +35,13 @@ class Main:
         return _data['realPay']
 
     def start(self):
-        self.okx_exchange.connect()
-        self.trading.start()
-        print('主程序已打开')
+        try:
+            self.okx_exchange.connect()
+            self.trading.start()
+            print('主程序已打开')
+        except Exception as e:
+            print('全局状态捕获',e)
+        
 
     def dingding_msg(self, text, flag=False):
 

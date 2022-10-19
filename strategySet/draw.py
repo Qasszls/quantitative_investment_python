@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from util.TimeStamp import TimeTamp
+from share.TimeStamp import TimeTamp
 
 
 class DrawMacd():

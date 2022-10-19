@@ -2,7 +2,7 @@
 
 from events.event import EVENT_TICK, EVENT_LOGIN, EVENT_ERROR, EVENT_POSITION, EVENT_ACCOUNT
 from events.engine import Event, EventEngine
-from util.TimeStamp import TimeTamp
+from share.TimeStamp import TimeTamp
 import base64
 import hmac
 import sys
@@ -110,7 +110,7 @@ class PrivateSocketApi(BaseSocketApi):
 
         BaseSocketApi.__init__(self)
 
-        self.apiKey = user_info['access_key']
+        self.apiKey = user_info['api_key']
         self.market_lv = user_info['market_lv']
         self.passphrase = user_info['passphrase']
         self.SecretKey = user_info['secret_key']

@@ -8,7 +8,7 @@ import emoji
 import sys
 
 sys.path.append('..')
-from util.request import Request
+from share.request import Request
 
 
 class MarketCrawler:

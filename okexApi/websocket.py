@@ -1,15 +1,15 @@
-from events.event import EVENT_TICK, EVENT_LOGIN, EVENT_ERROR, EVENT_INFO, EVENT_POSITION, EVENT_ACCOUNT
+from events.event import EVENT_TICK, EVENT_ERROR, EVENT_INFO, EVENT_POSITION, EVENT_ACCOUNT
 from events.engine import Event, EventEngine
-from util.TimeStamp import TimeTamp
+from share.TimeStamp import TimeTamp
+from share.utils import to_json_parse, to_json_stringify
 import base64
 import hmac
 import sys
 import time
 import websocket
-import json
+from okexApi.constants import ARG_ACCOUNT, ARG_POSITION, EVENT_LOGIN, EVENT_UNSUBSCRIBE, PUB_URL, PRI_URL, EVENT_SUBSCRIBE, EVENT_ERROR
 from queue import Empty, Queue
 from threading import Thread
-sys.path.append('okexApi')
 
 """
    BaseSocketApi:最底层socket，链接服务器，多线程执行，提供订阅和取消订阅的接口。
@@ -19,9 +19,6 @@ sys.path.append('okexApi')
     我想写个业务层包裹的websocket但是我的抽象和分层能力需要锻炼，不太懂什么放在什么层。
     业务层的内容可以放在Engine类中，比如发送事件；收集到的数据的处理；私有频道登录动作的监听。
 """
-
-PUB_URL = "wss://ws.okx.com:8443/ws/v5/public"
-PRI_URL = "ws://ws.okx.com:8443/ws/v5/private"
 
 
 class Active:
@@ -62,7 +59,7 @@ class BaseSocketApi:
         self.thread.start()
 
     # 订阅频道
-    def add_channel(self, args, op='subscribe'):
+    def add_channel(self, args, op=EVENT_SUBSCRIBE):
         if self.active:
             self._push(args=args, op=op)
         else:
@@ -70,7 +67,7 @@ class BaseSocketApi:
             self._queue.put(active)
 
     # 取消订阅频道
-    def remove_channel(self, args, op='unsubscribe'):
+    def remove_channel(self, args, op=EVENT_UNSUBSCRIBE):
         if self.active:
             self._push(args=args, op=op)
         else:
@@ -83,7 +80,7 @@ class BaseSocketApi:
         self.thread.join()
 
     # 推送信息
-    def _push(self, op='subscribe', args=None):
+    def _push(self, op=EVENT_SUBSCRIBE, args=None):
         _a = []
         # 编辑args
         if isinstance(args, list):
@@ -98,7 +95,7 @@ class BaseSocketApi:
             return
         # 发送订阅
         _s = {'op': op, 'args': _a}
-        self.ws.send(json.dumps(_s))
+        self.ws.send(to_json_stringify(_s))
 
     # 生命周期函数 再包装
     def ON_OPEN(self, ws):
@@ -115,7 +112,7 @@ class BaseSocketApi:
 
     def ON_MESSAGE(self, ws, *arg):
         if self.message_callback:
-            self.message_callback(ws, arg)
+            self.message_callback(arg)
 
     # 长连接关闭的回调
     def ON_CLOSED(self, ws, *arg):
@@ -150,10 +147,10 @@ class OkxExchange:
         self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE)
 
     def connect(self):
-        # self.private.connect_sever()
+        self.private.connect_sever()
         self.public.connect_sever()
         # 启动私有模块
-        # self.private.add_channel(op='login', args=self._get_login_args())
+        self.private.add_channel(op=EVENT_LOGIN, args=self._get_login_args())
         # 启动行情模块
         self.public.add_channel(
             args={"channel": self.user_info['market_lv'], "instId": self.user_info['symbol']})
@@ -166,7 +163,7 @@ class OkxExchange:
         def _get_sign():
             message = str(timestamp) + "GET" + '/users/self/verify'
             mac = hmac.new(
-                bytes(self.user_info['SecretKey'].encode('utf-8')),
+                bytes(self.user_info['secret_key'].encode('utf-8')),
                 bytes(message.encode('utf-8')),
                 digestmod="sha256",
             )
@@ -176,7 +173,7 @@ class OkxExchange:
 
         args = {'apiKey': '', 'passphrase': '', 'timestamp': '', 'sign': ''}
 
-        args['apiKey'] = self.user_info['apiKey']
+        args['apiKey'] = self.user_info['api_key']
         args['passphrase'] = self.user_info['passphrase']
         args['timestamp'] = timestamp
         args['sign'] = _get_sign()
@@ -185,12 +182,12 @@ class OkxExchange:
 
     def on_login(self):
         # 订阅用户持仓
-        self.public.add_channel(args={
+        self.private.add_channel(args={
             "channel": "positions",
             "instType": "ANY"
         })
         # 订阅用户账户数据
-        self.public.add_channel(args={
+        self.private.add_channel(args={
             "channel": "account",
         })
 
@@ -225,12 +222,44 @@ class OkxExchange:
         """
         self._put(EVENT_ERROR, error)
 
-    def _put(self, event):
+    def _put(self, type, data):
+        event: Event = Event(type, data)
         self.event_engine.put(event)
 
-    def ON_MESSAGE(self, *args):
-        # 判断数据内容逻辑
-        print('on_message', args)
+    # 登录特殊处理
+    def _login_message_handle(self, msg):
+        event_code = msg['code']
+        if event_code == '0':
+            self.on_login()
+        else:
+            raise Exception('登录失败, code ====>', event_code)
 
-    def ON_LOGIN(self, ws):
-        pass
+    # 频道订阅返回结果处理函数
+    def _event_message_handle(self, msg):
+        event_name = msg['event']  # 事件名称 目前使用 login,
+        if event_name == EVENT_LOGIN:
+            self._login_message_handle(msg)
+        elif event_name == EVENT_ERROR:  # 报错处理
+            self.on_error(msg)
+        else:
+            self.on_event(msg)
+
+    # 推送数据结果处理
+    def _arg_subscribe_handle(self, msg):
+        channel_name = msg['arg']['channel']
+        if channel_name == ARG_ACCOUNT:
+            self.on_account(msg)
+        elif channel_name == ARG_POSITION:
+            self.on_position(msg)
+        elif channel_name == self.user_info['market_lv']:
+            self.on_tick(msg)
+
+    def ON_MESSAGE(self, message_tuple):
+        # 数据类型转化
+        message_str = message_tuple[0]
+        message_dict = to_json_parse(message_str)
+        # 判断数据内容逻辑
+        if 'event' in message_dict:  # 频道订阅结果推送
+            self._event_message_handle(message_dict)
+        else:  # 其他数据流推送
+            self._arg_subscribe_handle(message_dict)

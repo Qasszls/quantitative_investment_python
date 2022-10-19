@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 sys.path.append("..")
 
-from util.TimeStamp import TimeTamp
-from util.OsHandler import OsHandler
+from share.TimeStamp import TimeTamp
+from share.OsHandler import OsHandler
 from MarketCrawler import MarketCrawler
 from MySqlHandler import MySqlHandler
 

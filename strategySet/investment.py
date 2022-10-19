@@ -13,7 +13,7 @@ from tqdm import tqdm
 # from pyecharts.charts import Line
 
 sys.path.append('..')
-from util.TimeStamp import TimeTamp
+from share.TimeStamp import TimeTamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from sqlHandler import SqlHandler
 
