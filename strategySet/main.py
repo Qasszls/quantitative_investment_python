@@ -13,7 +13,7 @@ sys.path.append('..')
 if re.search('/main/server', os.getcwd()):
     sys.path.append(
         '/Users/work/web/quantitative_investment_python/py/main/strategySet')
-# from util.OsHandler import OsHandler
+# from share.OsHandler import OsHandler
 from sqlHandler import SqlHandler
 from investment import Investment
 
