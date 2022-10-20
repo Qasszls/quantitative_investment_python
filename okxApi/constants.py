@@ -13,3 +13,7 @@ EVENT_UNSUBSCRIBE = 'unsubscribe'
 # 推送数据刘
 ARG_ACCOUNT = 'aAccount'
 ARG_POSITION = 'aPosition'
+
+# 公有私有
+WEBSOCKET_CLIENT_PUBLIC_NAME = 'public'
+WEBSOCKET_CLIENT_PRIVATE_NAME = 'private'

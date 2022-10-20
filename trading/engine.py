@@ -59,7 +59,6 @@ class Trading:
         }
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         self.ding = DingtalkChatbot(webhook)
-        
 
     def start(self):
         self._set_lever()
@@ -114,9 +113,9 @@ class Trading:
                 MACD_DATA
             )
             self.old_kl = kline_data
-            
 
     # 钩子函数 计算中
+
     def onCalculate(self, res):
         # 变量定义
         None
@@ -128,7 +127,7 @@ class Trading:
         kline_data = data['kline_data']  # k线数据包
         # macd_data = data['macd_data']  # macd数据包
         _step = data['step']  # 策略执行步骤
-        
+
         id_tamp = kline_data['id_tamp']  # 时间戳
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,买卖区间起点：' +
                           self.timeTamp.get_time_normal(id_tamp))
@@ -157,7 +156,7 @@ class Trading:
             'tdMode': tdMode,
             'side': action,
             'ordType': ordType,
-            'sz': availBuy * self.lever * 0.50,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+            'sz': availBuy * self.lever * 0.30,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
             'ccy': ccy,
         }
         # 下订单-市价买入
@@ -229,7 +228,6 @@ class Trading:
 
 # 工具查询---buy/sell阶段-数量
 
-
     def _set_lever(self):
         print('杠杆配置中')
         # 设置杠杆倍数 交易前配置
@@ -253,20 +251,18 @@ class Trading:
         if tdMode == 'cross':
             _max_size_params['ccy'] = ccy
         # 获得野生可购买数量 - 烹饪食材
-        print('获得野生可购买数量 - 烹饪食材')
         _m_a_s_data, error = self.http.get_account_max_avail_size(
             _max_size_params)
         _m_a_s_data = _m_a_s_data[0]
         _m_s_availBuy = float(_m_a_s_data['availBuy'])  # 获得最大买入数量 ***
         _m_s_availSell = float(_m_a_s_data['availSell'])  # 获得最大卖出数量 ***
         # 获取交易产品基础信息 - 烹饪调料
-        print('获取交易产品基础信息 - 烹饪调料')
         _p_i_result, error = self.http.get_public_instruments({
             'instType': instType,
             'instId': instId
         })
         _p_i_lotSz = _p_i_result[0]['lotSz']  # 最小下单数量精度 ***
-
+        print('最小下单精度', _p_i_lotSz)
         # 具体可购买数量 - 开启烹饪
         _sz = len(str(_p_i_lotSz).split('.')[1])
         _m_s_availBuy = round(_m_s_availBuy, _sz)

@@ -1,3 +1,4 @@
+import threading
 from events.event import EVENT_TICK, EVENT_ERROR, EVENT_INFO, EVENT_POSITION, EVENT_ACCOUNT
 from events.engine import Event, EventEngine
 from share.TimeStamp import TimeTamp
@@ -7,7 +8,8 @@ import hmac
 import sys
 import time
 import websocket
-from okexApi.constants import ARG_ACCOUNT, ARG_POSITION, EVENT_LOGIN, EVENT_UNSUBSCRIBE, PUB_URL, PRI_URL, EVENT_SUBSCRIBE, EVENT_ERROR
+import gc
+from okxApi.constants import WEBSOCKET_CLIENT_PUBLIC_NAME, WEBSOCKET_CLIENT_PRIVATE_NAME, ARG_ACCOUNT, ARG_POSITION, EVENT_LOGIN, EVENT_UNSUBSCRIBE, PUB_URL, PRI_URL, EVENT_SUBSCRIBE, EVENT_ERROR
 from queue import Empty, Queue
 from threading import Thread
 
@@ -34,28 +36,31 @@ class BaseSocketApi:
     """基础技术类
     """
 
-    def __init__(self, url, message_callback):
+    def __init__(self, url, message_handle, close_handle):
         self.ws = None
-        self.thread = None
-        self.message_callback = message_callback  # 通讯函数
+        self.message_handle = message_handle  # 通讯函数
+        self.close_handle = close_handle  # 长连接关闭函数
         self._queue: Queue = Queue()
         self.active = False
         self.url = url
-        self.thread: Thread = Thread(target=self.run)
+        self.thread: Thread = None
 
     # 链接服务器
     def run(self):
         self.ws = websocket.WebSocketApp(self.url,
                                          on_open=self.ON_OPEN,
                                          on_message=self.ON_MESSAGE,
+                                         on_pong=self.ON_PONG,
+                                         on_ping=self.ON_PING,
                                          on_error=self.ON_ERROR,
                                          on_close=self.ON_CLOSED)
-        self.ws.run_forever(http_proxy_host="127.0.0.1",
+        self.ws.run_forever(ping_interval=25, ping_timeout=2, http_proxy_host="127.0.0.1",
                             http_proxy_port=10000, proxy_type='socks5')
 
     # 监听长连接
     def connect_sever(self):
         # 本机代理链接
+        self.thread = Thread(target=self.run)
         self.thread.start()
 
     # 订阅频道
@@ -97,6 +102,16 @@ class BaseSocketApi:
         _s = {'op': op, 'args': _a}
         self.ws.send(to_json_stringify(_s))
 
+    # ping
+    def ON_PING(self, *arg):
+        # print('ping', arg)
+        pass
+
+    # pong
+    def ON_PONG(self, *arg):
+        # print('pong', arg)
+        pass
+
     # 生命周期函数 再包装
     def ON_OPEN(self, ws):
         # 链接已经开启
@@ -111,13 +126,20 @@ class BaseSocketApi:
     # 服务端频道推送数据回调
 
     def ON_MESSAGE(self, ws, *arg):
-        if self.message_callback:
-            self.message_callback(arg)
+        if self.message_handle:
+            self.message_handle(arg)
 
     # 长连接关闭的回调
     def ON_CLOSED(self, ws, *arg):
         self.active = False
-        self.thread.join()
+        if self.close_handle:
+            name = ''
+            if self.url == PUB_URL:
+                name = WEBSOCKET_CLIENT_PUBLIC_NAME
+            else:
+                name = WEBSOCKET_CLIENT_PRIVATE_NAME
+            self.close_handle(name)
+        # 可以发送一个长连接不健康的事件，主线程抓住这个问题，可以
 
     # 遇到网络问题，自动重连
     def ON_ERROR(self, ws, *error):
@@ -132,7 +154,6 @@ class BaseSocketApi:
                 self.run()
                 time.sleep(2)
         else:
-            print("其他error!")
             print(error)
 
 
@@ -143,15 +164,15 @@ class OkxExchange:
     def __init__(self, event_engine, user_info):
         self.event_engine = event_engine
         self.user_info = user_info
-        self.private = BaseSocketApi(PRI_URL, self.ON_MESSAGE)
-        self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE)
+        self.private = BaseSocketApi(PRI_URL, self.ON_MESSAGE, self.ON_CLOSE)
+        self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE, self.ON_CLOSE)
 
     def connect(self):
-        self.private.connect_sever()
-        self.public.connect_sever()
         # 启动私有模块
+        self.private.connect_sever()
         self.private.add_channel(op=EVENT_LOGIN, args=self._get_login_args())
         # 启动行情模块
+        self.public.connect_sever()
         self.public.add_channel(
             args={"channel": self.user_info['market_lv'], "instId": self.user_info['symbol']})
 
@@ -263,3 +284,15 @@ class OkxExchange:
             self._event_message_handle(message_dict)
         else:  # 其他数据流推送
             self._arg_subscribe_handle(message_dict)
+
+    def ON_CLOSE(self, name):
+        if name == WEBSOCKET_CLIENT_PUBLIC_NAME:
+            # 启动行情模块
+            self.public.connect_sever()
+            self.public.add_channel(
+                args={"channel": self.user_info['market_lv'], "instId": self.user_info['symbol']})
+        else:
+            # 启动私有模块
+            self.private.connect_sever()
+            self.private.add_channel(
+                op=EVENT_LOGIN, args=self._get_login_args())
