@@ -19,7 +19,7 @@ class Main:
         self.event_engine.start()
 
         self.okx_exchange = OkxExchange(self.event_engine,
-                                           user_info=self.user_info)  # 初始化长连接
+                                        user_info=self.user_info)  # 初始化长连接
         self.http = HttpApi(user_info=self.user_info)  # 初始化短连接
         self.trading = Trading(
             self.event_engine, self.http, self.get_user_info())
@@ -40,8 +40,7 @@ class Main:
             self.trading.start()
             print('主程序已打开')
         except Exception as e:
-            print('全局状态捕获',e)
-        
+            print('全局状态捕获', e)
 
     def dingding_msg(self, text, flag=False):
 
