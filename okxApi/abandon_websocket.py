@@ -10,7 +10,7 @@ import time
 import websocket
 import json
 from threading import Thread
-sys.path.append('okexApi')
+sys.path.append('okxApi')
 
 
 PUB_URL = "wss://ws.okx.com:8443/ws/v5/public"

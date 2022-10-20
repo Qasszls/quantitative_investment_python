@@ -4,8 +4,8 @@ import time
 import emoji
 from trading.engine import Trading
 from share.TimeStamp import TimeTamp
-from okexApi.websocket import OkxExchange
-from okexApi._http import HttpApi
+from okxApi.websocket import OkxExchange
+from okxApi._http import HttpApi
 from events.engine import EventEngine
 
 from dingtalkchatbot.chatbot import DingtalkChatbot
@@ -16,19 +16,16 @@ class Main:
         self.user_info = self.get_user_info()
 
         self.event_engine = EventEngine()
-        self.event_engine.start()
-
         self.okx_exchange = OkxExchange(self.event_engine,
                                         user_info=self.user_info)  # 初始化长连接
         self.http = HttpApi(user_info=self.user_info)  # 初始化短连接
         self.trading = Trading(
-            self.event_engine, self.http, self.get_user_info())
+            self.event_engine, self.http, self.user_info)
         self.timeTamp = TimeTamp()  # 初始化时间操作对象
         webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
         self.ding = DingtalkChatbot(webhook)
 
     # 主函数
-
     def get_user_info(self):
         f = open('config.json', 'r', encoding='utf-8')
         _data = json.load(f)
@@ -36,6 +33,7 @@ class Main:
 
     def start(self):
         try:
+            self.event_engine.start()
             self.okx_exchange.connect()
             self.trading.start()
             print('主程序已打开')
