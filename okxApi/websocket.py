@@ -55,7 +55,7 @@ class BaseSocketApi:
                                          on_error=self.ON_ERROR,
                                          on_close=self.ON_CLOSED)
         # replace-start
-        self.ws.run_forever(ping_interval=25, ping_timeout=2, http_proxy_host="127.0.0.1",
+        self.ws.run_forever(ping_interval=25, ping_timeout=12, http_proxy_host="127.0.0.1",
                             http_proxy_port=10000, proxy_type='socks5')
         # replace-end
 
