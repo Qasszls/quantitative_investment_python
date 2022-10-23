@@ -63,7 +63,7 @@ sys.path.append('..')
 
 
 class SimpleMacd():
-    def __init__(self, odds, event_engine):
+    def __init__(self, event_engine):
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -73,7 +73,6 @@ class SimpleMacd():
             'again_confirmation': None
         }
         self.step = 0
-        self.odds = odds
         self.event_engine = event_engine
         self.timeTamp = TimeTamp()
 
@@ -159,33 +158,8 @@ class SimpleMacd():
     def _is_golden_cross(self, macd):
         return macd > 0
 
-    # 非严格模式的 白线收盘价是否背离
-    def _loose_deviate_from(self):
-        odds = self.odds
-
-        # 内部函数
-        def _get_odds(mode='dif'):
-            if mode == 'dif':
-                first = self.lowest_dif['first_confirmation']
-                again = self.lowest_dif['again_confirmation']
-                return abs((first - again) / again) <= odds
-            else:
-                first = self.lowest_price['first_confirmation']
-                again = self.lowest_price['again_confirmation']
-                return abs((again - first) / first) <= odds
-
-        if self._is_white_line_up() and self._is_down_channel():
-            return True
-        elif self._is_white_line_up() and _get_odds('price'):
-            return True
-        elif self._is_down_channel() and _get_odds('dif'):
-            return True
-        else:
-            return False
-
-        # 白线波谷上移 或 收盘价创新低
-
     # 白线是否上移
+
     def _is_white_line_up(self):
         return self.lowest_dif['again_confirmation'] > self.lowest_dif[
             'first_confirmation']
@@ -257,8 +231,6 @@ class SimpleMacd():
         if self._is_under_water(macdDist['dif'], macdDist['dea']):
             if self._is_golden_cross(macdDist['macd']):
                 if self._is_white_line_up() and self._is_down_channel():
-                    self.step = 9999
-                elif self._loose_deviate_from():
                     self.step = 9999
                 else:
                     self.step = 2

@@ -30,11 +30,10 @@ class Trading:
 
         self.checkSurplus = 0.16  # 玩家止盈率
         self.stopLoss = 0.08  # 玩家止损率
-        self.lever = 10  # 杠杆倍数
-        self.odds = 0.05  # 宽容度
+        self.lever = 6  # 杠杆倍数
         self.update_times = 0
 
-        self.simpleMacd = SimpleMacd(self.odds, self.event_engine)
+        self.simpleMacd = SimpleMacd(self.event_engine)
 
         # 内部变量
         self.buy_times = 0
@@ -156,7 +155,7 @@ class Trading:
             'tdMode': tdMode,
             'side': action,
             'ordType': ordType,
-            'sz': availBuy * self.lever * 0.30,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+            'sz': availBuy * self.lever * 0.15,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
             'ccy': ccy,
         }
         # 下订单-市价买入
@@ -227,6 +226,7 @@ class Trading:
 
 
 # 工具查询---buy/sell阶段-数量
+
 
     def _set_lever(self):
         print('杠杆配置中')
