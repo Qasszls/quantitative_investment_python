@@ -28,13 +28,12 @@ class Trading:
         self.event_engine = event_engine
         self.http = http
 
-        self.checkSurplus = 0.16  # 玩家止盈率
-        self.stopLoss = 0.08  # 玩家止损率
+        self.checkSurplus = 0.08  # 玩家止盈率
+        self.stopLoss = 0.04  # 玩家止损率
         self.lever = 10  # 杠杆倍数
-        self.odds = 0.05  # 宽容度
         self.update_times = 0
 
-        self.simpleMacd = SimpleMacd(self.odds, self.event_engine)
+        self.simpleMacd = SimpleMacd(self.event_engine)
 
         # 内部变量
         self.buy_times = 0
@@ -76,9 +75,14 @@ class Trading:
 
         # 更新持仓数据
 
-    def update_position(self, data):
-        if data['upl'] != '':
-            uplRatio = float(data['uplRatio'])
+    def update_position(self, event):
+        message = event.data
+        data = message['data']
+        if len(data) > 0 and 'uplRatio' in data[0]:
+            # 目前是全仓模式，最多只有一笔订单，此处不用处理的太复杂
+            earnings = data[0]
+            uplRatio = float(earnings['uplRatio'])
+            print('uplRatio', uplRatio)
 
             def _is_checkSurplus():
                 return uplRatio >= self.checkSurplus
@@ -156,7 +160,7 @@ class Trading:
             'tdMode': tdMode,
             'side': action,
             'ordType': ordType,
-            'sz': availBuy * self.lever * 0.30,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
+            'sz': availBuy * self.lever * 0.15,  # 计价货币乘上杠杆 再半仓，优化保证金率，控制风险
             'ccy': ccy,
         }
         # 下订单-市价买入
@@ -180,6 +184,7 @@ class Trading:
         }
         # 下订单-市价平仓
         res, err = self.http.close_position(params)
+        print('已经卖出', res)
         if err:
             self.dingding_msg('卖出失败，请手动平仓' + str(err))
         else:

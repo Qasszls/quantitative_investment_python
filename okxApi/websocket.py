@@ -54,8 +54,10 @@ class BaseSocketApi:
                                          on_ping=self.ON_PING,
                                          on_error=self.ON_ERROR,
                                          on_close=self.ON_CLOSED)
-        self.ws.run_forever(ping_interval=25, ping_timeout=2, http_proxy_host="127.0.0.1",
-                            http_proxy_port=10000, proxy_type='socks5')
+        self.ws.run_forever(ping_interval=25, ping_timeout=12                            # delete-start
+                            , http_proxy_host="127.0.0.1",
+                            http_proxy_port=10000, proxy_type='socks5'  # delete-end
+                            )
 
     # 监听长连接
     def connect_sever(self):
@@ -268,6 +270,7 @@ class OkxExchange:
     # 推送数据结果处理
     def _arg_subscribe_handle(self, msg):
         channel_name = msg['arg']['channel']
+
         if channel_name == ARG_ACCOUNT:
             self.on_account(msg)
         elif channel_name == ARG_POSITION:
