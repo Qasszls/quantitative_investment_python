@@ -1,19 +1,23 @@
 # -*- coding:UTF-8 -*-
 
+from share.utils import to_json_stringify
+from share.request import Request
 import sys
 import asyncio
 import time
 import json
 
 from numpy import result_type
+from events.engine import Event
+from events.event import EVENT_LOG
 
 sys.path.append('..')
-from share.request import Request
 
 
 class HttpApi:
-    def __init__(self, user_info=None):
+    def __init__(self, event_engine, user_info=None):
         self.req = Request(user_info)
+        self.event_engine = event_engine
 
     # 再次封装
     def request(self, path, params=None, body=None, methods='GET', auth=False):
@@ -29,7 +33,9 @@ class HttpApi:
         if result:
             return result['data'], error
         else:
-            print('接口', path, error)
+            event: Event = Event(EVENT_LOG, '接口'+path +
+                                 to_json_stringify(error))
+            self.event_engine.put(event)
             return result, error
 
     # 获取okex服务器时间
