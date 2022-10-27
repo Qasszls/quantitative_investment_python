@@ -9,10 +9,9 @@ import pandas as pd
 
 from share.TimeStamp import TimeTamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
-from events.engine import EventEngine
-from events.event import EVENT_TICK, EVENT_POSITION, EVENT_CALCULATE, EVENT_COMPUTED
-
-from dingtalkchatbot.chatbot import DingtalkChatbot
+from events.engine import EventEngine, Event
+from events.event import EVENT_TICK, EVENT_POSITION, EVENT_CALCULATE, EVENT_COMPUTED, EVENT_DING, EVENT_LOG
+from logging import INFO
 
 
 class Trading:
@@ -56,8 +55,10 @@ class Trading:
             'market',  # 倾向策略方式 conditional：单向止盈止损、oco：双向止盈止损、trigger：计划委托
             'subscribe': user_info['subscribe'],  # 监听的频道列表
         }
-        webhook = 'https://oapi.dingtalk.com/robot/send?access_token=cb4b89ef41c8008bc4526bc33d2733a8c830f1c10dd6701a58c3ad149d35c8cc'
-        self.ding = DingtalkChatbot(webhook)
+
+    def dingding_msg(self, msg):
+        event: Event = Event(EVENT_DING, msg)
+        self.event_engine.put(event)
 
     def start(self):
         self._set_lever()
@@ -68,13 +69,7 @@ class Trading:
         self.event_engine.register(EVENT_CALCULATE, self.onCalculate)
         self.event_engine.register(EVENT_COMPUTED, self.completed)
 
-    def dingding_msg(self, text, flag=False):
-        text = text + '  作业时间：' + self.timeTamp.get_time_normal(
-            time.time() * 1000) + ' :525'
-        self.ding.send_text(msg=text, is_at_all=flag)
-
-        # 更新持仓数据
-
+    # 更新持仓数据
     def update_position(self, event):
         message = event.data
         data = message['data']
@@ -82,7 +77,6 @@ class Trading:
             # 目前是全仓模式，最多只有一笔订单，此处不用处理的太复杂
             earnings = data[0]
             uplRatio = float(earnings['uplRatio'])
-            print('uplRatio', uplRatio)
 
             def _is_checkSurplus():
                 return uplRatio >= self.checkSurplus
@@ -145,7 +139,6 @@ class Trading:
             result = self._get_trad_sz()
         except BaseException as err:
             self.dingding_msg('获得计价货币函数出现问题, 重启函数' + str(err))
-            print('获得计价货币函数出现问题, 重启函数' + str(err))
         action = 'buy'
         availBuy = result['availBuy']  # 当前计价货币最大可用的数量 一般是 USDT
         # 获取变量
@@ -184,7 +177,6 @@ class Trading:
         }
         # 下订单-市价平仓
         res, err = self.http.close_position(params)
-        print('已经卖出', res)
         if err:
             self.dingding_msg('卖出失败，请手动平仓' + str(err))
         else:
@@ -233,15 +225,16 @@ class Trading:
 
 # 工具查询---buy/sell阶段-数量
 
+
     def _set_lever(self):
-        print('杠杆配置中')
+        self.log('杠杆配置中')
         # 设置杠杆倍数 交易前配置
         instId = self.okex_api_info['instId']
         lever = self.okex_api_info['lever']
         mgnMode = self.okex_api_info['mgnMode']
         _s_p = {'instId': instId, 'lever': lever, 'mgnMode': mgnMode}
         self.http.set_account_set_leverage(_s_p)
-        print('杠杆配置完毕')
+        self.log('杠杆配置完毕')
 
     def _get_trad_sz(self):
         instId = self.okex_api_info['instId']
@@ -267,7 +260,6 @@ class Trading:
             'instId': instId
         })
         _p_i_lotSz = _p_i_result[0]['lotSz']  # 最小下单数量精度 ***
-        print('最小下单精度', _p_i_lotSz)
         # 具体可购买数量 - 开启烹饪
         _sz = len(str(_p_i_lotSz).split('.')[1])
         _m_s_availBuy = round(_m_s_availBuy, _sz)
@@ -278,3 +270,8 @@ class Trading:
             'availBuy': _m_s_availBuy,
             'availSell': _m_s_availSell,
         }
+
+    def log(self, msg, level=INFO):
+        data = {'msg': msg, 'level': level}
+        event: Event = Event(EVENT_LOG, data)
+        self.event_engine.put(event)

@@ -1,5 +1,5 @@
 import threading
-from events.event import EVENT_TICK, EVENT_ERROR, EVENT_INFO, EVENT_POSITION, EVENT_ACCOUNT
+from events.event import EVENT_TICK, EVENT_ERROR, EVENT_POSITION, EVENT_ACCOUNT, EVENT_LOG
 from events.engine import Event, EventEngine
 from share.TimeStamp import TimeTamp
 from share.utils import to_json_parse, to_json_stringify
@@ -12,12 +12,11 @@ import gc
 from okxApi.constants import WEBSOCKET_CLIENT_PUBLIC_NAME, WEBSOCKET_CLIENT_PRIVATE_NAME, ARG_ACCOUNT, ARG_POSITION, EVENT_LOGIN, EVENT_UNSUBSCRIBE, PUB_URL, PRI_URL, EVENT_SUBSCRIBE, EVENT_ERROR
 from queue import Empty, Queue
 from threading import Thread
+from logging import ERROR, INFO
 
 """
    BaseSocketApi:最底层socket，链接服务器，多线程执行，提供订阅和取消订阅的接口。
    DataHandle:区分订阅成功与失败的返回，区分订阅成功后推送的返回。指定on_tick等回调函数，继承者可以覆盖。
-    我于鏊干嘛
-    写蒙蔽了
     我想写个业务层包裹的websocket但是我的抽象和分层能力需要锻炼，不太懂什么放在什么层。
     业务层的内容可以放在Engine类中，比如发送事件；收集到的数据的处理；私有频道登录动作的监听。
 """
@@ -145,18 +144,7 @@ class BaseSocketApi:
 
     # 遇到网络问题，自动重连
     def ON_ERROR(self, ws, *error):
-        global reconnect_count
-        self.active = False
-        if type(error) == ConnectionRefusedError or type(
-                error
-        ) == websocket._exceptions.WebSocketConnectionClosedException:
-            print("正在尝试第%d次重连" % reconnect_count)
-            reconnect_count += 1
-            if reconnect_count < 100:
-                self.run()
-                time.sleep(2)
-        else:
-            print(error)
+        pass
 
 
 class OkxExchange:
@@ -166,10 +154,18 @@ class OkxExchange:
     def __init__(self, event_engine, user_info):
         self.event_engine = event_engine
         self.user_info = user_info
+
+    def create_connect(self):
         self.private = BaseSocketApi(PRI_URL, self.ON_MESSAGE, self.ON_CLOSE)
         self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE, self.ON_CLOSE)
 
+    def clear_connect(self):
+        self.private = None
+        self.public = None
+        gc.collect()
+
     def connect(self):
+        self.create_connect()
         # 启动私有模块
         self.private.connect_sever()
         self.private.add_channel(op=EVENT_LOGIN, args=self._get_login_args())
@@ -214,11 +210,11 @@ class OkxExchange:
             "channel": "account",
         })
 
-    def on_event(self, info) -> None:
+    def log(self, msg, level=INFO) -> None:
         """
         Event event push.
         """
-        self._put(EVENT_INFO, info)
+        self._put(EVENT_LOG, {'level': level, 'msg': msg})
 
     def on_tick(self, tick) -> None:
         """
@@ -238,12 +234,15 @@ class OkxExchange:
         """
         self._put(EVENT_ACCOUNT, account)
 
+    def on_event(self, event) -> None:
+        pass
     # 在和服务器接口交互时出现错误信息，调用该回调函数
+
     def on_error(self, error) -> None:
         """
         Account event push.
         """
-        self._put(EVENT_ERROR, error)
+        self._put(EVENT_LOG, {'level': ERROR, 'msg': error})
 
     def _put(self, type, data):
         event: Event = Event(type, data)
@@ -270,7 +269,6 @@ class OkxExchange:
     # 推送数据结果处理
     def _arg_subscribe_handle(self, msg):
         channel_name = msg['arg']['channel']
-
         if channel_name == ARG_ACCOUNT:
             self.on_account(msg)
         elif channel_name == ARG_POSITION:
@@ -289,6 +287,8 @@ class OkxExchange:
             self._arg_subscribe_handle(message_dict)
 
     def ON_CLOSE(self, name):
+        time.sleep(5)
+        self.log(level=INFO, msg='重连'+name + '模块')
         if name == WEBSOCKET_CLIENT_PUBLIC_NAME:
             # 启动行情模块
             self.public.connect_sever()
