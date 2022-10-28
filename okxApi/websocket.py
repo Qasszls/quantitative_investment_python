@@ -146,7 +146,6 @@ class BaseSocketApi:
     def ON_ERROR(self, ws, *error):
         pass
 
-
 class OkxExchange:
     """衍生业务类
     """
@@ -157,12 +156,7 @@ class OkxExchange:
 
     def create_connect(self):
         self.private = BaseSocketApi(PRI_URL, self.ON_MESSAGE, self.ON_CLOSE)
-        self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE, self.ON_CLOSE)
-
-    def clear_connect(self):
-        self.private = None
-        self.public = None
-        gc.collect()
+        self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE, self.ON_CLOSE) 
 
     def connect(self):
         self.create_connect()
@@ -287,7 +281,7 @@ class OkxExchange:
             self._arg_subscribe_handle(message_dict)
 
     def ON_CLOSE(self, name):
-        time.sleep(5)
+        time.sleep(7)
         self.log(level=INFO, msg='重连'+name + '模块')
         if name == WEBSOCKET_CLIENT_PUBLIC_NAME:
             # 启动行情模块
@@ -299,3 +293,4 @@ class OkxExchange:
             self.private.connect_sever()
             self.private.add_channel(
                 op=EVENT_LOGIN, args=self._get_login_args())
+        
