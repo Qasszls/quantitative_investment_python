@@ -16,32 +16,20 @@ class LogEngine:
         self.event_engine = event_engine
         self.level: int = SETTINGS["log.level"]
 
-        self.logger: Logger = logging.getLogger("quant")
+        self.logger: Logger = logging.getLogger()
         self.logger.setLevel(self.level)
-
         self.formatter: logging.Formatter = logging.Formatter(
             "%(asctime)s  %(levelname)s: %(message)s"
         )
-        self.add_null_handler()
-
-        if SETTINGS["log.console"]:
-            self.add_console_handler()
-
+        self.add_console_handler()
         self.register_event()
-
-    def add_null_handler(self) -> None:
-        """
-        Add null handler for logger.
-        """
-        null_handler: logging.NullHandler = logging.NullHandler()
-        self.logger.addHandler(null_handler)
 
     def add_console_handler(self) -> None:
         """
         Add console output of log.
         """
         console_handler: logging.StreamHandler = logging.StreamHandler()
-        console_handler.setLevel(self.level)
+        console_handler.setLevel(INFO)
         console_handler.setFormatter(self.formatter)
         self.logger.addHandler(console_handler)
 

@@ -27,8 +27,8 @@ class Trading:
         self.event_engine = event_engine
         self.http = http
 
-        self.checkSurplus = 0.08  # 玩家止盈率
-        self.stopLoss = 0.04  # 玩家止损率
+        self.checkSurplus = 0.11  # 玩家止盈率
+        self.stopLoss = 0.07  # 玩家止损率
         self.lever = 10  # 杠杆倍数
         self.update_times = 0
 
@@ -73,7 +73,7 @@ class Trading:
     def update_position(self, event):
         message = event.data
         data = message['data']
-        if len(data) > 0 and 'uplRatio' in data[0]:
+        if len(data) > 0 and 'uplRatio' in data[0] and data[0]['uplRatio'] != '':
             # 目前是全仓模式，最多只有一笔订单，此处不用处理的太复杂
             earnings = data[0]
             uplRatio = float(earnings['uplRatio'])
