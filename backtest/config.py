@@ -11,7 +11,8 @@ CONFIG = {
     "name": '柳尚佐',
     "table_name": "BTC_USDT_5m",
     "start_timestamp":"2021-8-29 23:59:59",
-    "end_timestamp":"2022-10-29 23:59:59"
+    # "start_timestamp":"2022-9-1 00:00:00",
+    "end_timestamp":"2022-10-30 00:00:00"
 }
 
 

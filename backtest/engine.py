@@ -102,7 +102,6 @@ class TestEngine:
     def completed(self, res):
         data = res.data
         medium_status = data['medium_status']  # 初级判断状态
-        # macd_data = data['macd_data']  # macd数据包
         _step = data['step']  # 策略执行步骤
 
         if medium_status and self.buy_times <= 2:

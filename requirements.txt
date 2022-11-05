@@ -8,3 +8,4 @@ websocket==0.2.1
 websocket-client==1.4.1
 pymysql==1.0.2
 dbutils==2.0.1
+tqdm==4.61.0

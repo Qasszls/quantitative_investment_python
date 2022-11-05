@@ -19,7 +19,7 @@ class LogEngine:
         self.logger: Logger = logging.getLogger()
         self.logger.setLevel(self.level)
         self.formatter: logging.Formatter = logging.Formatter(
-            "%(asctime)s  %(levelname)s: %(message)s"
+            "\n%(asctime)s  %(levelname)s: %(message)s"
         )
         self.add_console_handler()
         self.register_event()
@@ -46,7 +46,7 @@ class LogEngine:
         msg = log['msg']
         if log['level']:
             level = log['level']
-        self.logger.log(level, msg)
+        self.logger.log(level,msg)
 
 
 class DingDingEngine:
