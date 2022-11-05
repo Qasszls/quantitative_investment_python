@@ -21,3 +21,6 @@ EVENT_COMPUTED = 'eComputed'
 
 # 异常事件
 EVENT_ERROR = 'eError'
+
+# 爬虫数据响应
+K_LINE_DATA = "eklineData"

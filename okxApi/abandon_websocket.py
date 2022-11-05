@@ -2,7 +2,7 @@
 
 from events.event import EVENT_TICK, EVENT_LOGIN, EVENT_ERROR, EVENT_POSITION, EVENT_ACCOUNT
 from events.engine import Event, EventEngine
-from share.TimeStamp import TimeTamp
+from share.TimeStamp import Timestamp
 import base64
 import hmac
 import sys

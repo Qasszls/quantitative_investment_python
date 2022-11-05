@@ -1,7 +1,7 @@
 import threading
 from events.event import EVENT_TICK, EVENT_ERROR, EVENT_POSITION, EVENT_ACCOUNT, EVENT_LOG
 from events.engine import Event, EventEngine
-from share.TimeStamp import TimeTamp
+from share.TimeStamp import Timestamp
 from share.utils import to_json_parse, to_json_stringify
 import base64
 import hmac

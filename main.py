@@ -3,7 +3,7 @@ import json
 import time
 import emoji
 from trading.engine import Trading
-from share.TimeStamp import TimeTamp
+from share.TimeStamp import Timestamp
 from okxApi.websocket import OkxExchange
 from okxApi._http import HttpApi
 from events.engine import EventEngine
@@ -24,7 +24,7 @@ class Main:
                             user_info=self.user_info)  # 初始化短连接
         self.trading = Trading(
             self.event_engine, self.http, self.user_info)
-        self.timeTamp = TimeTamp()  # 初始化时间操作对象
+        self.timestamp = Timestamp()  # 初始化时间操作对象
 
     # 主函数
     def get_user_info(self):
@@ -49,9 +49,9 @@ class Main:
     #             if item['state'] == 'ongoing':
     #                 self.dingding_msg(
     #                     '服务器正在更新中,更新开始时间: ' +
-    #                     self.timeTamp.get_time_normal(item['begin']) +
+    #                     self.timestamp.get_time_normal(item['begin']) +
     #                     '; 更新结束时间: ' +
-    #                     self.timeTamp.get_time_normal(item['end']))
+    #                     self.timestamp.get_time_normal(item['end']))
     #                 # 找出最长更新时间段
     #                 if _utimes < int(item['end']):
     #                     _utimes = int(item['end'])
@@ -59,13 +59,13 @@ class Main:
     #             elif item['state'] == 'scheduled':
     #                 self.dingding_msg(
     #                     '服务器有更新计划,更新开始时间: ' +
-    #                     self.timeTamp.get_time_normal(item['begin']) +
+    #                     self.timestamp.get_time_normal(item['begin']) +
     #                     '; 更新结束时间: ' +
-    #                     self.timeTamp.get_time_normal(item['end']))
+    #                     self.timestamp.get_time_normal(item['end']))
     #                 print('服务器有更新计划,更新开始时间: ' +
-    #                       self.timeTamp.get_time_normal(item['begin']) +
+    #                       self.timestamp.get_time_normal(item['begin']) +
     #                       '; 更新结束时间: ' +
-    #                       self.timeTamp.get_time_normal(item['end']))
+    #                       self.timestamp.get_time_normal(item['end']))
     #         self.update_times = _utimes
     #     elif error:
     #         # 网络问题 轮询请求接口，等待网络恢复

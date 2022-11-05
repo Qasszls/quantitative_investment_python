@@ -7,7 +7,7 @@ import emoji
 import numpy as np
 import pandas as pd
 
-from share.TimeStamp import TimeTamp
+from share.TimeStamp import Timestamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from events.engine import EventEngine, Event
 from events.event import EVENT_TICK, EVENT_POSITION, EVENT_CALCULATE, EVENT_COMPUTED, EVENT_DING, EVENT_LOG
@@ -23,7 +23,7 @@ class Trading:
             print('请填写用户信息')
             return
 
-        self.timeTamp = TimeTamp()  # 初始化时间操作对象
+        self.timestamp = Timestamp()  # 初始化时间操作对象
         self.event_engine = event_engine
         self.http = http
 
@@ -128,7 +128,7 @@ class Trading:
 
         id_tamp = kline_data['id_tamp']  # 时间戳
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,买卖区间起点：' +
-                          self.timeTamp.get_time_normal(id_tamp))
+                          self.timestamp.get_time_normal(id_tamp))
         if medium_status and self.buy_times <= 2:
             # 买入 钩子
             self.allBuy()

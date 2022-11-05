@@ -1,5 +1,6 @@
 # -*- coding:UTF-8 -*-
 
+from logging import INFO
 from share.utils import to_json_stringify
 from share.request import Request
 import sys
@@ -33,8 +34,9 @@ class HttpApi:
         if result:
             return result['data'], error
         else:
-            event: Event = Event(EVENT_LOG, '接口'+path +
-                                 to_json_stringify(error))
+            event_data = {'msg': '接口'+path +
+                    to_json_stringify(error), 'level': INFO}
+            event: Event = Event(EVENT_LOG, event_data)
             self.event_engine.put(event)
             return result, error
 

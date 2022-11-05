@@ -47,7 +47,7 @@ for item in kline:
     # 止盈 大于当前价格 22%
     
 """
-from share.TimeStamp import TimeTamp
+from share.TimeStamp import Timestamp
 from os import close
 import sys
 # import talib
@@ -74,7 +74,7 @@ class SimpleMacd():
         }
         self.step = 0
         self.event_engine = event_engine
-        self.timeTamp = TimeTamp()
+        self.timestamp = Timestamp()
 
     def on_event(self, event: Event):
         self.event_engine.put(event)
@@ -127,7 +127,7 @@ class SimpleMacd():
             self._step_3(todayMacd)
             if self.step == 2:
                 # print('dif', self.lowest_dif, 'price', self.lowest_price,
-                #       'date', self.timeTamp.get_time_normal(med_tamp))
+                #       'date', self.timestamp.get_time_normal(med_tamp))
 
                 # 回抽零轴后波谷可能 深于【首次死叉】时的波谷，故尝试记录一下
                 self.price_lowest_record(
@@ -141,7 +141,7 @@ class SimpleMacd():
                 return False
             elif self.step == 9999:
                 # print('dif', self.lowest_dif, 'price', self.lowest_price,
-                #       'date', self.timeTamp.get_time_normal(med_tamp))
+                #       'date', self.timestamp.get_time_normal(med_tamp))
                 return True
         elif self.step == 9999:
             self._reset()
