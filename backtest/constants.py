@@ -1,7 +1,4 @@
 # 数据库错误码
-from logging import _Level
-
-
 TABLE_NOT_EXITS = 1146
 
 BUY = -1.0

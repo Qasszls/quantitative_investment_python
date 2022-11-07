@@ -33,10 +33,21 @@ class DownloadBar:
         self.bar = ''
 
 
+add_service_charge = 0.0  # 手续费累计
+# 胜率
+win_times = 0.0
+game_times = 0
+add_up = 0.0  # 累计金额
+# 赔率
+odds = 0.0
+
+
 class UserInfo:
     def __init__(self, config):
         self.name = config['name']
         self.config = config
+        self.margin_lever = 0.0  # 保证金
+        self.liability = config['liability']  # 负债
         # 持仓字段
         self.uplRatio = 0.0  # 未实现收益率
         self.avgPx = config['avgPx']  # 开仓均价
@@ -45,12 +56,20 @@ class UserInfo:
         # 用户资产字段
         self.availBal = config['initFund']  # 用户可用资产
 
+    # 保证金变动
+
+    def margin_lever_change(self, money):
+        self.margin_lever = money
+
     # 资产变动
-    def account_change(self, availBal):
-        self.availBal = availBal
+    def account_change(self, availBal=None, liability=None):
+        if liability != None:
+            self.liability = liability
+        if availBal != None:
+            self.availBal = availBal
 
     # 仓位变动
-    def positions_change(self, uplRatio=None, avgPx=None, availPos=None,):
+    def positions_change(self, uplRatio=None, avgPx=None, availPos=None):
         if uplRatio != None:
             self.uplRatio = uplRatio  # 设置收益率
         if avgPx != None:
@@ -64,22 +83,47 @@ class UserInfo:
         availPos = 0.0
         avgPx = 0.0
         uplRatio = 0.0
-        if type == BUY:
-            availBal = count* price * BUY * (1+self.config['eatOrder']) * \
-                (1+self.config['slippage']) + self.availBal  # 总价等于数量乘单价
-            availPos = count + self.availPos  # 货币数量等于数量
-            avgPx = price if int(self.avgPx) == 0 else (
-                self.avgPx + price)/2  # 如果存在旧价格，将新旧货格相加除权
-            uplRatio = (price-avgPx)/avgPx  # 收益率等于持仓均价 - 现价 后除持仓均价
-        else:
-            availBal = price * self.availPos * SELL*(1+self.config['eatOrder']) * \
-                (1-self.config['slippage']) + self.availBal  # 收益等于现价乘持仓数量
+        liability = 0.0
+        margin_lever = 0.0
+        global add_service_charge, add_up
+        if type == BUY:  # 杠杆版本
+            real_price = price * (1+self.config['slippage'])  # 购买价格
+            liability = real_price * count + self.liability  # 总负债
+            new_margin_lever = count * real_price / self.lever  # 保证金
+            margin_lever = new_margin_lever + self.margin_lever  # 总保证金
+            service_charge = real_price * count * \
+                self.config['eatOrder']  # 手续费
+            add_service_charge = add_service_charge + service_charge  # test
+            spend = service_charge + new_margin_lever  # 花费
+            availBal = self.availBal - spend  # 剩余可用
+
+            availPos = count + self.availPos  # 持仓数量
+            avgPx = real_price if int(self.avgPx) == 0 else (
+                self.avgPx + real_price)/2  # 持仓均价
+            upl = price * availPos - liability  # 收益
+
+            uplRatio = upl / margin_lever   # 收益率
+        else:  # 售卖 保证金版本
+            real_price = price * (1-self.config['slippage'])  # 出售价格
+            asset = real_price * self.availPos  # 仓位资产
+            # 如果亏损过大，就将亏损固定为 4%
+            if (asset-(self.avgPx * self.availPos))/(self.avgPx * self.availPos) <= -0.004:
+                asset = (self.avgPx * self.availPos)*(1-0.004)
+            service_charge = asset * self.config['eatOrder']  # 手续费
+            add_service_charge = add_service_charge + service_charge  # test
+            earnings = asset - self.liability - service_charge  # 收益
+            add_up = add_up + earnings  # test
+
+            availBal = earnings + self.availBal + self.margin_lever   # 剩余可用
 
         self.positions_change(
             uplRatio=uplRatio, availPos=availPos, avgPx=avgPx)
-        self.account_change(availBal=availBal)
+        self.account_change(availBal=availBal,
+                            liability=liability)
+        self.margin_lever_change(money=margin_lever)
 
     # 获得用户持仓
+
     def get_positions(self, type=None):
         # 获得用户持仓的数据结构
         _pos = PositionsStructure(
@@ -102,7 +146,9 @@ class UserInfo:
     # 更新用户持仓
     def update_positions(self, close):
         if int(self.avgPx) != 0:
-            uplRatio = (close-self.avgPx)/self.avgPx  # 收益率等于持仓均价 - 现价 后除持仓均价
+            upl = close * self.availPos - self.liability  # 收益率
+            uplRatio = upl / self.margin_lever  # 收益率
+
             self.positions_change(uplRatio=uplRatio)
 
 
@@ -136,7 +182,7 @@ class Exchange:
 
         self.bar = config['bar']
         self.bar_val = int(re.findall('\d+', self.bar)[0])
-        self.unit = re.findall('[a-z]', self.bar)[0]
+        self.unit = re.findall('[a-zA-Z]', self.bar)[0]
 
         self.table_name = config['table_name']
         self.min_fetch = 100
@@ -161,7 +207,7 @@ class Exchange:
         # 检查所属数据库数据
         self._checkout_table(self.table_name)
         # 初始化数据库数据
-        # self._data_init()
+        self._data_init()
         # 开启回测函数
         self.start_back_test()
 
@@ -169,6 +215,8 @@ class Exchange:
     def _data_init(self):
         flag = input('是否更新行情数据？(yes/no)')
         if is_pass(flag):
+            print('数据开始时间', self.start_timestamp,
+                  '数据结束时间', self.end_timestamp)
             self.runtime_start = timer()
             # 初始化游标
             self.timestamp_cursor = self.end_timestamp
@@ -223,11 +271,19 @@ class Exchange:
 
     # 出售
     def sell(self, count=0):
+        global win_times, game_times, add_up, add_service_charge
         if count == 0:
+            # print('{type}价 {price}'.format(price=self.market.close, type='买入' if BUY ==
+            #                                          SELL else '卖出'), '几月几号:', self.timestamp.get_time_normal(self.market.timestamp))
+            game_times = game_times + 1
+            is_win = True if self.user.avgPx < self.market.close else False
+            win_times = win_times + 1 if is_win else win_times
+            # print('胜率', win_times/game_times *
+            #       100, '%')
+            # '交易额度', self.user.liability
+            # print('收益累计', add_up, '手续费累计', add_service_charge)
             # 全部出售
             self.user.user_trading(price=self.market.close, type=SELL)
-            # self.on_account()
-            # self.on_positions()
         else:
             # 部分出售
             pass

@@ -29,8 +29,8 @@ class TestEngine:
         self.exchange_engine = exchange_engine  # 交易所引擎
         self.event_engine = exchange_engine.event_engine
 
-        self.checkSurplus = 0.11  # 玩家止盈率
-        self.stopLoss = 0.07  # 玩家止损率
+        self.checkSurplus = 0.337  # 玩家止盈率
+        self.stopLoss = 0.142  # 玩家止损率
         self.lever = 10  # 杠杆倍数
         self.update_times = 0
         self.tick_times = 0
@@ -61,13 +61,14 @@ class TestEngine:
         time = data['timestamp']
         money = data['details'][0]['availBal']  # 目前可用资产
         equity = self.exchange_engine.user.availPos * \
-            self.exchange_engine.market.close  # 权益类资产
+            self.exchange_engine.market.close - self.exchange_engine.user.liability + \
+            self.exchange_engine.user.margin_lever  # 权益类资产
         total = equity + money  # 总资产
 
         fund = self.config['initFund']  # 初始资金
         uplRatio = "%.2f" % ((total-fund)/fund*100)  # 收益率
-        # print('目前总资产: {total}, 总收益率: {uplRatio}%, 可用资产{money}; {time}'.format(
-        #     uplRatio=uplRatio, total=total, money=money, time=self.timestamp.get_time_normal(time)))
+        print('目前总资产: {total}, 总收益率: {uplRatio}%, 可用资产{money}; {time}'.format(
+            uplRatio=uplRatio, total=total, money=money, time=self.timestamp.get_time_normal(time)))
 
     # 更新持仓数据
     def update_position(self, event):
@@ -77,7 +78,6 @@ class TestEngine:
             # 目前是全仓模式，最多只有一笔订单，此处不用处理的太复杂
             earnings = data[0]
             uplRatio = float(earnings['uplRatio'])
-
             def _is_checkSurplus():
                 return uplRatio >= self.checkSurplus
 
@@ -86,12 +86,9 @@ class TestEngine:
                     return abs(uplRatio) >= self.stopLoss
                 else:
                     return False
-                
-            print('止盈止损', uplRatio, '时间：',
-                      self.timestamp.get_time_normal(earnings['timestamp']))
+
             # 检测止盈止损
             if _is_checkSurplus() or _is_sotpLoss():
-           
                 self.allSell()
 
     def breathing(self, kline_event):
@@ -126,8 +123,6 @@ class TestEngine:
     def computed(self, res):
         data = res.data
         medium_status = data['medium_status']  # 初级判断状态
-        _step = data['step']  # 策略执行步骤
-        # print('策略运行===>', data['kline_data']['id_tamp'], data)
         if medium_status and self.buy_times <= 2:
             # 买入 钩子
             self.allBuy()
@@ -136,11 +131,12 @@ class TestEngine:
     def allBuy(self):
         # 用户最大可买
         count = self.exchange_engine.user.availBal * \
-            0.15 / float(Market(self.old_kl).close)
+            0.15 / float(Market(self.old_kl).close) * self.lever
+        # print('买点: ', self.timestamp.get_time_normal(self.old_kl[0]))
         self.exchange_engine.buy(count)
-        print('买点: ', self.timestamp.get_time_normal(self.old_kl[0]))
 
     def allSell(self):
+        # print('卖点', self.timestamp.get_time_normal(self.old_kl[0]))
         self.exchange_engine.sell()
 
     def _before_investment(self, kline_data):
