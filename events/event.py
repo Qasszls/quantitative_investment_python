@@ -16,11 +16,11 @@ EVENT_LOG = "eLog"
 EVENT_DING = "elog"
 
 # 策略运行事件
-EVENT_CALCULATE = 'eCalculate'
 EVENT_COMPUTED = 'eComputed'
 
 # 异常事件
 EVENT_ERROR = 'eError'
 
-# 爬虫数据响应
 K_LINE_DATA = "eklineData"
+# 爬虫数据响应
+SAVE_DATA = "esaveData"

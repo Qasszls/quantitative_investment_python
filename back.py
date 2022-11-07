@@ -39,14 +39,12 @@ class Main:
                                  config=self.config_set.get_config())
 
         self.backtest = TestEngine(
-            self.event_engine, self.config_set.get_config())
+            self.exchange, self.config_set.get_config())
 
     def start(self):
         self.backtest.start()
         self.event_engine.start()
         self.exchange.start()
-
-
 
 
 if __name__ == "__main__":

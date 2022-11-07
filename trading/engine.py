@@ -2,7 +2,6 @@
 from atexit import register
 import json
 import time
-import sys
 import emoji
 import numpy as np
 import pandas as pd
@@ -10,7 +9,7 @@ import pandas as pd
 from share.TimeStamp import Timestamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from events.engine import EventEngine, Event
-from events.event import EVENT_TICK, EVENT_POSITION, EVENT_CALCULATE, EVENT_COMPUTED, EVENT_DING, EVENT_LOG
+from events.event import EVENT_TICK, EVENT_POSITION, EVENT_COMPUTED, EVENT_DING, EVENT_LOG
 from logging import INFO
 
 
@@ -66,7 +65,6 @@ class Trading:
         self.event_engine.register(EVENT_TICK, self.breathing)
         self.event_engine.register(EVENT_POSITION, self.update_position)
         # 监听策略回调
-        self.event_engine.register(EVENT_CALCULATE, self.onCalculate)
         self.event_engine.register(EVENT_COMPUTED, self.completed)
 
     # 更新持仓数据

@@ -5,7 +5,7 @@ from pymysql.cursors import SSCursor
 from dbutils.pooled_db import PooledDB
 import logging
 from events.engine import Event
-from events.event import EVENT_TICK
+from events.event import K_LINE_DATA
 from logging import Logger, INFO, ERROR, DEBUG
 from json import loads, dumps
 
@@ -140,8 +140,7 @@ class Sql(BaseSql):
             total = ss_cursor.fetchone()
             if not total:
                 break
-            self._put(EVENT_TICK, total)
-        self.logger.log(INFO,'传输完毕')
+            self._put(K_LINE_DATA, total)
 
     def is_table_exist(self, table_name):
         sql = "SELECT count(*) num FROM information_schema.TABLES WHERE table_schema = '{database_name}' AND table_name = '{table_name}' AND table_type = 'BASE TABLE'".format(

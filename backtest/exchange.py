@@ -1,10 +1,10 @@
 import time
-from events.event import EVENT_TICK, EVENT_ERROR, EVENT_POSITION, EVENT_ACCOUNT, EVENT_LOG, K_LINE_DATA
+from events.event import EVENT_TICK, EVENT_POSITION, EVENT_ACCOUNT, EVENT_LOG, K_LINE_DATA, SAVE_DATA
 from events.engine import Event, EventEngine
 from share.TimeStamp import Timestamp
 from share.utils import to_json_parse, to_json_stringify, is_pass
 from backtest.crawler import OkxCrawlerEngine
-from backtest.constants import PositionsStructure, AccountStructure, TABLE_NOT_EXITS
+from backtest.constants import PositionsStructure, AccountStructure, TABLE_NOT_EXITS, Market, BUY, SELL
 import re
 from logging import ERROR, INFO
 from backtest.SQLhandler import Sql
@@ -34,36 +34,76 @@ class DownloadBar:
 
 
 class UserInfo:
-    def __init__(self, name, availBal, coin):
-        self.name = name
-        self._positions = PositionsStructure(coin)  # 用户初始币数量 浮点型
-        self._account = AccountStructure(availBal)
+    def __init__(self, config):
+        self.name = config['name']
+        self.config = config
+        # 持仓字段
+        self.uplRatio = 0.0  # 未实现收益率
+        self.avgPx = config['avgPx']  # 开仓均价
+        self.availPos = config['initCoin']  # 可平仓数量
+        self.lever = config['lever']
+        # 用户资产字段
+        self.availBal = config['initFund']  # 用户可用资产
 
     # 资产变动
-    def account_change(self, diff):
-        availBal = self._account.get_data('availBal')
-        self._account.set_data('availBal', availBal + diff)
+    def account_change(self, availBal):
+        self.availBal = availBal
 
     # 仓位变动
-    def positions_change(self, uplRatio=None, avgPx=None, availPos=None):
-        if uplRatio:
-            self._positions.set_data('uplRatio', uplRatio)  # 设置收益率
-        elif avgPx:
-            self._positions.set_data('avgPx', avgPx)  # 设置开仓均价
-        elif availPos:
-            self._positions.set_data('availPos', availPos)  # 设置可平仓数量
+    def positions_change(self, uplRatio=None, avgPx=None, availPos=None,):
+        if uplRatio != None:
+            self.uplRatio = uplRatio  # 设置收益率
+        if avgPx != None:
+            self.avgPx = avgPx  # 设置开仓均价
+        if availPos != None:
+            self.availPos = availPos  # 设置可平仓数量
+
+    # 用户购买
+    def user_trading(self, count: float = 0.0, price: float = 0.0, type: float = BUY):
+        availBal = 0.0
+        availPos = 0.0
+        avgPx = 0.0
+        uplRatio = 0.0
+        if type == BUY:
+            availBal = count* price * BUY * (1+self.config['eatOrder']) * \
+                (1+self.config['slippage']) + self.availBal  # 总价等于数量乘单价
+            availPos = count + self.availPos  # 货币数量等于数量
+            avgPx = price if int(self.avgPx) == 0 else (
+                self.avgPx + price)/2  # 如果存在旧价格，将新旧货格相加除权
+            uplRatio = (price-avgPx)/avgPx  # 收益率等于持仓均价 - 现价 后除持仓均价
+        else:
+            availBal = price * self.availPos * SELL*(1+self.config['eatOrder']) * \
+                (1-self.config['slippage']) + self.availBal  # 收益等于现价乘持仓数量
+
+        self.positions_change(
+            uplRatio=uplRatio, availPos=availPos, avgPx=avgPx)
+        self.account_change(availBal=availBal)
 
     # 获得用户持仓
-    def get_positions(self):
-        return self._positions.get_data()
+    def get_positions(self, type=None):
+        # 获得用户持仓的数据结构
+        _pos = PositionsStructure(
+            uplRatio=self.uplRatio, avgPx=self.avgPx, availPos=self.availPos, lever=self.lever)
+        # 如果传入字段名，返回内容data里的数据
+        if type:
+            return _pos.data[type]
+        else:
+            return vars(_pos)
 
     # 获得用户资产信息
-    def get_account(self):
-        return self._account.get_data()
+    def get_account(self, type=None):
+        _acc = AccountStructure(fund=self.availBal)
+        # 如果传入字段名，返回内容data里的数据
+        if type:
+            return _acc.data[type]
+        else:
+            return vars(_acc)
 
-    # 获得用户持有的币种数量
-    def get_positions_coin_count(self):
-        return self._positions.get_data('availPos')
+    # 更新用户持仓
+    def update_positions(self, close):
+        if int(self.avgPx) != 0:
+            uplRatio = (close-self.avgPx)/self.avgPx  # 收益率等于持仓均价 - 现价 后除持仓均价
+            self.positions_change(uplRatio=uplRatio)
 
 
 class Exchange:
@@ -101,7 +141,7 @@ class Exchange:
         self.table_name = config['table_name']
         self.min_fetch = 100
         # 行情信息
-        self.market = []
+        self.market = {}
 
         # 性能信息
         self.runtime_start = 0
@@ -109,15 +149,21 @@ class Exchange:
 
         # 账户信息
         self.user = UserInfo(
-            config['name'], config['initFund'], config['initCoin'])
+            config)
+        # 事件表
+        self.event_dict = {
+            EVENT_TICK: "",
+            EVENT_POSITION: "",
+            EVENT_ACCOUNT: ""
+        }
 
     def start(self):
         # 检查所属数据库数据
         self._checkout_table(self.table_name)
         # 初始化数据库数据
-        self._data_init()
+        # self._data_init()
         # 开启回测函数
-        self.fetch_market_by_timestamp()
+        self.start_back_test()
 
     # 数据初始化
     def _data_init(self):
@@ -129,7 +175,7 @@ class Exchange:
             # 获得粒度换算成毫秒的值
             interval = self._timestamp_to_ms()
             # 监听事件
-            self.event_engine.register(K_LINE_DATA, self.save_database)
+            self.event_engine.register(SAVE_DATA, self.save_database)
             # 创建进度条
             total_data = self._get_divide(
                 abs(self.end_timestamp - self.start_timestamp))
@@ -146,7 +192,6 @@ class Exchange:
                     after=after,  limit=limit)
 
     #  存到数据库里
-
     def save_database(self, market_event):
         # 解包
         data = market_event.data[0]['data']
@@ -162,29 +207,27 @@ class Exchange:
             self.log('数据初始化完毕，用时\n{second}秒\n'.format(
                 second="%.3f" % (self.runtime_end-self.runtime_start)))
 
-            # 获得指定时间戳内的行情数据
-    def fetch_market_by_timestamp(self):
+    # 开始回测
+    def start_back_test(self):
+        # 回测数据要流过交易所的管道，所以数据库获得了后不直接给策略
+        self.event_engine.register(K_LINE_DATA, self.on_tick)
         # 查询数据库
         self.sql_handler.search_table_content(self.table_name,
                                               self.start_timestamp, self.end_timestamp)
 
     def buy(self, count):
-        # 计算当前行情买这些币需要多少钱
-        pay_money = count * -1
-        # 结算花费的金钱
-        self.user.account_change(pay_money)
-        # 更新持仓和用户资产信息
-        self.on_positions()
-        self.on_account()
+        # 用户购买
+        self.user.user_trading(count=count, price=self.market.close, type=BUY)
+        # self.on_account()
+        # self.on_positions()
 
     # 出售
-    def sell(self, price, count=0):
+    def sell(self, count=0):
         if count == 0:
             # 全部出售
-            # 根据行情 计算售卖手里所有的币的收益
-            money = price * self.user.get_positions_coin_count()
-            self.user.account_change(money)  # 加上这部分钱
-            self.user.positions_change(0, 0, 0)  # 将用户持仓信息设置为空
+            self.user.user_trading(price=self.market.close, type=SELL)
+            # self.on_account()
+            # self.on_positions()
         else:
             # 部分出售
             pass
@@ -195,26 +238,49 @@ class Exchange:
         """
         self._put(EVENT_LOG, {'level': level, 'msg': msg})
 
-    def on_tick(self, tick) -> None:
+    def on_tick(self, tick_event) -> None:
         """
         Tick event push.
         """
-        self._put(EVENT_TICK, tick)
+        # 更新当前行情信息
+        self.market = Market(tick_event.data)
+        # 先更新持仓和用户资产信息
+        self.on_positions()
+        self.on_account()
+        # 再触发行情事件 将实例对象转为数组
+        self.process(EVENT_TICK, list(self.market.k_line_data))
 
     def on_positions(self) -> None:
         """
         Position event push.
         """
+        # 获得格式化的用户持仓数据
         position = self.user.get_positions()
-        self._put(EVENT_POSITION, position)
+        # 更新持仓信息
+        self.user.update_positions(self.market.close)
+        # 对象增强
+        position['data'][0]['timestamp'] = self.market.timestamp
+        # 发送事件通知交易模块
+        self.process(EVENT_POSITION, position)
 
     def on_account(self) -> None:
         """
         Account event push.
         """
         account = self.user.get_account()
-        self._put(EVENT_ACCOUNT, account)
+        account['data'][0]['timestamp'] = self.market.timestamp
+        self.process(EVENT_ACCOUNT, account)
 
+    # 注册回调函数
+    def register(self, event_name, handle):
+        self.event_dict[event_name] = handle
+
+    # 处理回调函数
+    def process(self, event_name, data):
+        if self.event_dict[event_name]:
+            self.event_dict[event_name](Event(event_name, data))
+
+    # 推送事件
     def _put(self, type, data):
         event: Event = Event(type, data)
         self.event_engine.put(event)
@@ -280,7 +346,7 @@ class Exchange:
                 # 不创建表
                 raise Exception('请手动程序')
 
-        # 时间切片
+    # 时间切片
     def _time_slice(self, interval):
         limit = ''
         after = self.timestamp_cursor

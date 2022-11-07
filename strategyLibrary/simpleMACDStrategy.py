@@ -19,7 +19,7 @@ MACD原理
     零下: DIF < 0 and DEA < 0
     金叉: MACD > 0 and MACD 昨日 <= 0
     死叉: MACD < 0 and MACD 昨日 >= 0
-    价格不断创新低: 
+    价格不断创新低:
         价格低点: k线收盘价现最小值
         价格前低: k线收盘价前最小值
     macd快慢线 低点提高:
@@ -33,8 +33,8 @@ MACD原理
         执行队列
 		step0				step 1			step 2		  step3               step4
 		零下死叉============>是金叉=====>是死叉 and 水下====>是金叉====>白线低点是否上移 and 收盘价是否比前低更低
-        
-        
+
+
         因为在零下的快慢线低点上移后，自然就完成回抽零轴的动作，故策略与公式的转换完成。
 
 代码实现
@@ -45,7 +45,7 @@ for item in kline:
     # 止损 小于当前价格 10%
 
     # 止盈 大于当前价格 22%
-    
+
 """
 from share.TimeStamp import Timestamp
 from os import close
@@ -54,16 +54,14 @@ import sys
 import pandas as pd
 import emoji
 from events.engine import Event
-from events.event import EVENT_CALCULATE, EVENT_COMPUTED
+from events.event import EVENT_COMPUTED
 import time
 
 # talib.OBV
 
-sys.path.append('..')
-
 
 class SimpleMacd():
-    def __init__(self, event_engine):
+    def __init__(self, event_engine, computed=None):
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -75,6 +73,7 @@ class SimpleMacd():
         self.step = 0
         self.event_engine = event_engine
         self.timestamp = Timestamp()
+        self.computed = computed
 
     def on_event(self, event: Event):
         self.event_engine.put(event)
@@ -82,27 +81,19 @@ class SimpleMacd():
     def runStrategy(self, kline_data, macd_data):
         med_tamp = kline_data['id_tamp']
         close_price = kline_data['close_price']
-        # 计算中 钩子
-        event = Event(EVENT_CALCULATE, {
-            'close_price': close_price,
-            'id_tamp': med_tamp,
-        })
-        self.on_event(event)
 
         # 核心算法，是否做多，本级别确认
-        medium_status = self.medium_read(close_price, macd_data, med_tamp)
+        medium_status = self.medium_read(close_price, macd_data)
         # 实例化核心算法对象----高级别
-
-        event = Event(EVENT_COMPUTED, {
+        self.on_computed(EVENT_COMPUTED, {
             'medium_status': medium_status,
             'kline_data': kline_data,
             'macd_data': macd_data,
             "step": self.step
         })
-        self.on_event(event)
-
     # 本级别研判
-    def medium_read(self, close_price, todayMacd, med_tamp):
+
+    def medium_read(self, close_price, todayMacd):
         dif = todayMacd['dif']
         # 研判模块
         if self.step == 0:
@@ -126,9 +117,6 @@ class SimpleMacd():
             # 走研判内容
             self._step_3(todayMacd)
             if self.step == 2:
-                # print('dif', self.lowest_dif, 'price', self.lowest_price,
-                #       'date', self.timestamp.get_time_normal(med_tamp))
-
                 # 回抽零轴后波谷可能 深于【首次死叉】时的波谷，故尝试记录一下
                 self.price_lowest_record(
                     self.lowest_price['again_confirmation'],
@@ -140,9 +128,9 @@ class SimpleMacd():
                 self._reset('again_confirmation')
                 return False
             elif self.step == 9999:
-                # print('dif', self.lowest_dif, 'price', self.lowest_price,
-                #       'date', self.timestamp.get_time_normal(med_tamp))
                 return True
+            else:
+                return False
         elif self.step == 9999:
             self._reset()
             self._step_0(todayMacd)
@@ -253,3 +241,12 @@ class SimpleMacd():
         else:
             if dif < self.lowest_dif[time_quantum]:
                 self.lowest_dif[time_quantum] = dif
+
+    # 判断执行同步还是异步
+    def on_computed(self, type, data):
+        event = Event(type, data)
+        if self.computed:
+            self.computed(event)
+        else:
+            event = Event(type, data)
+            self.on_event(event)

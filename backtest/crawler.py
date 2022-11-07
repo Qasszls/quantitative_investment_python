@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from share.request import Request
-from events.event import K_LINE_DATA
+from events.event import SAVE_DATA
 from events.engine import Event
 import threading
 
@@ -39,5 +39,5 @@ class OkxCrawlerEngine(BaseEngine):
 
     # 触发事件
     def _put_data(self, kline):
-        event = Event(K_LINE_DATA, kline)
+        event = Event(SAVE_DATA, kline)
         self.event_engine.put(event)
