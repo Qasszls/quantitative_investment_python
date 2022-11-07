@@ -12,3 +12,11 @@ def to_json_parse(data):
 
 def to_json_stringify(data):
     return json.dumps(data)
+
+def is_pass(input):
+    pass_list = ['','y','yes','Y','YES']
+    if input in pass_list:
+        return True
+    else:
+        return False
+    

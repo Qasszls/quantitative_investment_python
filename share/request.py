@@ -11,13 +11,21 @@ from urllib.parse import urljoin
 
 class Request:
     """OKEX Spot REST API client."""
+
     def __init__(self, user_info=None):
-        # user_info
-        self._host = user_info['host']
-        self._api_key = user_info['api_key']
-        self._secret_key = user_info['secret_key']
-        self._passphrase = user_info['passphrase']
-        self.trading_type = user_info['trading_type']
+        if user_info:
+            # user_info
+            self._host = user_info['host']
+            self._api_key = user_info['api_key'] or ""
+            self._secret_key = user_info['secret_key'] or ""
+            self._passphrase = user_info['passphrase'] or ""
+            self.trading_type = user_info['trading_type'] or ""
+        else:
+            self._host = "https://www.okex.com"
+            self._api_key = ""
+            self._secret_key = ""
+            self._passphrase = ""
+            self.trading_type = ""
 
     # 工具函数
 
@@ -67,6 +75,7 @@ class Request:
             headers["OK-ACCESS-SIGN"] = sign
             headers["OK-ACCESS-TIMESTAMP"] = str(timestamp)
             headers["OK-ACCESS-PASSPHRASE"] = self._passphrase
+
         result = requests.request(method,
                                   url,
                                   data=body,
