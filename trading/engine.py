@@ -36,9 +36,9 @@ class Trading:
         # 内部变量
         self.buy_times = 0
         # 15m
-        self.ema12 = float(user_info['ema12'])
-        self.ema26 = float(user_info['ema26'])
-        self.dea = float(user_info['dea'])
+        self.ema12 = 0
+        self.ema26 = 0
+        self.dea = 0
         self.old_kl = []
 
         self.okex_api_info = {

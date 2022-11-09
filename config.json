@@ -126,9 +126,6 @@
       "note":"主账户",
       "market_lv":"candle5m",
       "trading_type":"1", 
-      "ema12":"19195.7",
-      "ema26":"19194.8",
-      "dea":"1.52171",
       "symbol": "BTC-USDT",
       "subscribe": {
         "private":["positions","account"],
