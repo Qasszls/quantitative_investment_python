@@ -7,13 +7,19 @@ CONFIG = {
     "entryOrders": 0.0008,  # 挂单手续费
     "eatOrder": 0.001,  # 吃单手续费
     "lever": 10,
+    "checkSurplus":0.322, # 止盈
+    "stopLoss": 0.169,# 止损
     "liability": 0.0,  # 负债
     "instId": "BTC-USDT",
     "name": '柳尚佐',
-    "bar": "1H",  # 粒度
-    "table_name": "BTC_USDT_1H",
-    "start_timestamp": "2019-10-1 20:00:00",
+    "bar": "2H",  # 粒度
+    "table_name": "BTC_USDT_2H",
+    "start_timestamp": "2018-1-1 20:00:00",
     "end_timestamp": "2022-11-6 00:00:00",
+    # "bar": "1H",  # 粒度
+    # "table_name": "BTC_USDT_1H",
+    # "start_timestamp": "2019-10-1 20:00:00",
+    # "end_timestamp": "2022-11-6 00:00:00",
     # "bar": "30m",  # 粒度
     # "table_name": "BTC_USDT_30m",
     # "start_timestamp": "2019-10-4 00:00:00",
@@ -24,7 +30,7 @@ CONFIG = {
     # "end_timestamp": "2022-11-6 00:00:00",
     # "bar": "5m",  # 粒度
     # "table_name": "BTC_USDT_5m",
-    # "start_timestamp": "2021-2-15 00:00:00",
+    # "start_timestamp": "2022-11-5 00:00:00",
     # "end_timestamp": "2022-11-6 00:00:00",
 }
 

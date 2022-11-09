@@ -61,7 +61,7 @@ import time
 
 
 class SimpleMacd():
-    def __init__(self, event_engine, computed=None):
+    def __init__(self, computed=None):
         self.lowest_price = {
             'first_confirmation': None,
             'again_confirmation': None
@@ -71,12 +71,8 @@ class SimpleMacd():
             'again_confirmation': None
         }
         self.step = 0
-        self.event_engine = event_engine
         self.timestamp = Timestamp()
         self.computed = computed
-
-    def on_event(self, event: Event):
-        self.event_engine.put(event)
 
     def runStrategy(self, kline_data, macd_data):
         med_tamp = kline_data['id_tamp']
@@ -85,7 +81,7 @@ class SimpleMacd():
         # 核心算法，是否做多，本级别确认
         medium_status = self.medium_read(close_price, macd_data)
         # 实例化核心算法对象----高级别
-        self.on_computed(EVENT_COMPUTED, {
+        self.on_computed({
             'medium_status': medium_status,
             'kline_data': kline_data,
             'macd_data': macd_data,
@@ -243,10 +239,5 @@ class SimpleMacd():
                 self.lowest_dif[time_quantum] = dif
 
     # 判断执行同步还是异步
-    def on_computed(self, type, data):
-        event = Event(type, data)
-        if self.computed:
-            self.computed(event)
-        else:
-            event = Event(type, data)
-            self.on_event(event)
+    def on_computed(self, data):
+        self.computed(data)

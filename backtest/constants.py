@@ -52,3 +52,11 @@ class Market:
         self.close = float(k_line_data[4])
         self.vol = float(k_line_data[5])
         self.volCcy = float(k_line_data[6])
+
+
+class AnalysisStructure:
+    def __init__(self, data: dict):
+        self.win_times = data['win_times']
+        self.game_times = data['game_times']
+        self.uplRatio = data['uplRatio']
+        self.config = data['config']

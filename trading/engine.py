@@ -31,7 +31,7 @@ class Trading:
         self.lever = 10  # 杠杆倍数
         self.update_times = 0
 
-        self.simpleMacd = SimpleMacd(self.event_engine)
+        self.simpleMacd = SimpleMacd(self.computed)
 
         # 内部变量
         self.buy_times = 0
@@ -64,8 +64,6 @@ class Trading:
         # 监听数据回调
         self.event_engine.register(EVENT_TICK, self.breathing)
         self.event_engine.register(EVENT_POSITION, self.update_position)
-        # 监听策略回调
-        self.event_engine.register(EVENT_COMPUTED, self.completed)
 
     # 更新持仓数据
     def update_position(self, event):
@@ -117,8 +115,7 @@ class Trading:
         None
 
     # 钩子函数 计算完成
-    def completed(self, res):
-        data = res.data
+    def computed(self, data):
         medium_status = data['medium_status']  # 初级判断状态
         kline_data = data['kline_data']  # k线数据包
         # macd_data = data['macd_data']  # macd数据包

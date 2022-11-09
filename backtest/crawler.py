@@ -1,43 +1,80 @@
 from concurrent.futures import ThreadPoolExecutor
-from share.request import Request
-from events.event import SAVE_DATA
-from events.engine import Event
 import threading
+import re
+
+from matplotlib.pyplot import bar
+from share.request import Request
+from events.engine import Event
+from share.utils import timestamp_to_ms, get_divide, get_time_normal, get_time_stamp
+import logging
+from logging import ERROR, INFO, Logger
 
 
 class BaseEngine:
-    def __init__(self, event_engine):
+    def __init__(self):
         self.pools = ThreadPoolExecutor(
             5, thread_name_prefix='Account_Thread_Pool')
         self.request = Request().request
-        self.event_engine = event_engine
         self.lock = threading.RLock()
+        self.logger: Logger = logging.getLogger()
+
     # 未来可以做一些进度条，每秒并发数量等数据展示的内容
 
 
 class OkxCrawlerEngine(BaseEngine):
-    def __init__(self,  event_engine, config=None) -> None:
-        BaseEngine.__init__(self, event_engine)
-        self.bar = config['bar']
-        self.instId = config['instId']
+    def __init__(self,  sql_handler) -> None:
+        BaseEngine.__init__(self)
+        self.sql_handler = sql_handler
 
-    def get_market(self,  after=None, limit=100):
-        try:
-            self.pools.submit(self._get_data, after, limit)
-        except Exception as e:
-            raise Exception('爬虫错误', str(e))
+    def get_market(self,  after=None, limit=100, config=None):
+        if not after or not config:
+            self.logger.log(level=ERROR, msg='入参错误')
 
-    def _get_data(self,  after=None, limit=100):
-        if not after:
-            print('当前未定义时间戳')
-
-        params = {"instId": self.instId, "bar": self.bar, "limit": limit}
+        bar_val = config['bar']
+        instId = config['instId']
+        table_name = config['table_name']
+        params = {"instId": instId, "bar": bar_val, "limit": limit}
         if after:
             params["after"] = str(after)
-        kline = self.request("GET", "/api/v5/market/history-candles", params)
-        self._put_data(kline)
+        kline, error = self.request(
+            "GET", "/api/v5/market/history-candles", params)
+        self.sql_handler.insert_kline_data(kline['data'], table_name)
 
-    # 触发事件
-    def _put_data(self, kline):
-        event = Event(SAVE_DATA, kline)
-        self.event_engine.put(event)
+     # 数据初始化
+
+    def init_market(self, config):
+        self.logger.log(level=INFO, msg='开始下载{bar}'.format(bar=config['bar']))
+        bar_val = int(re.findall('\d+', config['bar'])[0])
+        unit = re.findall('[a-zA-Z]', config['bar'])[0]
+        # 初始化游标
+        timestamp_cursor = get_time_stamp(config['end_timestamp'])
+        point_timestamp = get_time_stamp(config['start_timestamp'])
+        # 获得粒度换算成毫秒的值
+        interval = timestamp_to_ms(unit=unit, bar_val=bar_val)
+        limit = ''
+        while(True):
+            try:
+                # 剩余请求数量长度
+                count = get_divide(unit=unit,
+                                   ms=abs(timestamp_cursor - point_timestamp), bar_val=bar_val)
+                # 剩余的量不满足100，按照剩余量处理
+                if count < 100:
+                    limit = count
+                else:
+                    # 将时间戳向前推 一定的量
+                    limit = 100
+
+            except Exception as e:
+                print(str(e))
+            finally:
+                # 爬虫爬取数据
+                self.pools.submit(
+                    self.get_market, timestamp_cursor, limit, config)
+                # 更新游标
+                timestamp_cursor = timestamp_cursor - (interval * limit)
+
+            if limit <= 0:
+                break
+        self.pools.shutdown(wait=True)
+        self.logger.log(level=INFO, msg='下载完成：{bar}'.format(bar=config['bar']))
+        

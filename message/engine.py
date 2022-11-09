@@ -11,18 +11,15 @@ class LogEngine:
     Processes log event and output with logging module.
     """
 
-    def __init__(self,  event_engine) -> None:
+    def __init__(self) -> None:
 
-        self.event_engine = event_engine
         self.level: int = SETTINGS["log.level"]
-
         self.logger: Logger = logging.getLogger()
         self.logger.setLevel(self.level)
         self.formatter: logging.Formatter = logging.Formatter(
             "\n%(asctime)s  %(levelname)s: %(message)s"
         )
         self.add_console_handler()
-        self.register_event()
 
     def add_console_handler(self) -> None:
         """
@@ -33,10 +30,6 @@ class LogEngine:
         console_handler.setFormatter(self.formatter)
         self.logger.addHandler(console_handler)
 
-    def register_event(self) -> None:
-        """"""
-        self.event_engine.register(EVENT_LOG, self.process_log_event)
-
     def process_log_event(self, event) -> None:
         """
         Process log event.
@@ -46,7 +39,7 @@ class LogEngine:
         msg = log['msg']
         if log['level']:
             level = log['level']
-        self.logger.log(level,msg)
+        self.logger.log(level, msg)
 
 
 class DingDingEngine:
