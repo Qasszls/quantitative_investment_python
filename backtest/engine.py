@@ -78,6 +78,7 @@ class TestEngine:
             # 目前是全仓模式，最多只有一笔订单，此处不用处理的太复杂
             earnings = data[0]
             uplRatio = float(earnings['uplRatio'])
+
             def _is_checkSurplus():
                 return uplRatio >= self.checkSurplus
 
@@ -103,7 +104,7 @@ class TestEngine:
             _k = pd.DataFrame([kline_data]).astype(float)
             _k.columns = [
                 'id_tamp', 'open_price', 'high_price', 'lowest_price',
-                'close_price', 'vol', 'volCcy'
+                'close_price', 'vol', 'volCcy', 'volCcyQuote'
             ]
             KLINE_DATA = _k.to_dict('records')[0]
             # 准备数据-macd
@@ -181,6 +182,7 @@ class TestEngine:
 
 
 # 工具查询---buy/sell阶段-数量
+
 
     def log(self, msg, level=INFO):
         data = {'msg': msg, 'level': level}
