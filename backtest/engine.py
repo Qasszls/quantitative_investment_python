@@ -182,7 +182,3 @@ class TradingEngine:
 
 
 # 工具查询---buy/sell阶段-数量
-
-    def log(self, msg, level=INFO):
-        data = {'msg': msg, 'level': level}
-        event: Event = Event(EVENT_LOG, data)

@@ -1,9 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import logging
 from logging import DEBUG, ERROR, INFO, Logger
-import threading
-from time import sleep
-
+import traceback
 from backtest.crawler import OkxCrawlerEngine
 from backtest.SQLhandler import Sql
 from backtest.engine import TradingEngine
@@ -24,7 +22,7 @@ from events.event import BACK_TEST
 class BackTest:
     def __init__(self, event_engine):
         self.pools = ThreadPoolExecutor(
-            5, thread_name_prefix='Account_Thread_Pool')
+            3, thread_name_prefix='Account_Thread_Pool')
         self.sql_handler = Sql('127.0.0.1', 'root',
                                'QASS-utf-8', 'quant')
         self.logger: Logger = logging.getLogger()
@@ -32,7 +30,6 @@ class BackTest:
         self.event_engine: EventEngine = event_engine
 
     def start(self, groups):
-
         for config in groups:
             self.pools.submit(self.run, config)
         self.pools.shutdown(wait=True)
@@ -42,7 +39,6 @@ class BackTest:
             exchange, crawler = self.get_base_module(config=config)
             # 检查数据
             flag = self.checkout_table(config)
-
             # 初始化数据
             if not flag:
                 crawler.init_market(config)
@@ -52,7 +48,7 @@ class BackTest:
             event: Event = Event(type=BACK_TEST, data=analysis_data)
             self.event_engine.put(event)
         except Exception as e:
-            print(str(e))
+            print('back_test.run error: {err}'.format(err=traceback.format_exc()))
 
     def checkout_table(self, config):
         table_name = config['table_name']

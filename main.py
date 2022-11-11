@@ -16,7 +16,7 @@ class Main:
         self.event_engine = EventEngine()
         # 日志双雄
         self.dingding = DingDingEngine(self.event_engine)
-        self.logger = LogEngine(self.event_engine)
+        self.logger = LogEngine()
 
         self.okx_exchange = OkxExchange(self.event_engine,
                                         user_info=self.user_info)  # 初始化长连接

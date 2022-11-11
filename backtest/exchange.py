@@ -74,7 +74,7 @@ class UserInfo:
             market_asset = real_price * self.availPos  # 仓位资产现价
             current_asset = self.avgPx * self.availPos  # 仓位资产买入价
             # 控制亏损
-            if (market_asset-(current_asset))/(current_asset) <= -self.stopLoss:
+            if current_asset != 0 and (market_asset-(current_asset))/(current_asset) <= -self.stopLoss:
                 market_asset = (current_asset)*(1-self.stopLoss)
             service_charge = market_asset * self.config['eatOrder']  # 手续费
             earnings = market_asset - self.liability - service_charge  # 收益
@@ -157,7 +157,6 @@ class Exchange:
     def start(self):
         self.logger.log(
             level=INFO, msg="开始执行{name}回测程序".format(name=self.table_name))
-
         # 开启回测函数
         self.start_back_test()
         # 整理回测数据

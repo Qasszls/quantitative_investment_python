@@ -9,6 +9,7 @@ from backtest.exchange import Exchange
 from backtest.analysis import AnalysisEngine
 from backtest.index import BackTest
 from datetime import datetime
+from backtest.config import BASE_CONFIG, VAR_CONFIG, BAR_CONFIG, CHECK_SURPLUS_SCOPE, STOP_LOSS_SCOPE
 
 from events.engine import EventEngine
 from message.engine import LogEngine
@@ -26,43 +27,6 @@ from events.event import EVENT_TICK
     主线
     拿到数据喂给策略，看看周期的收益结果
 """
-TEST_GROUP = [
-    {"initFund": 5000000.0,  # 初始资金
-     "initCoin": 0.0,  # 初始币数量
-     "avgPx": 0.0,  # 开仓均价
-     "slippage": 0.0001,  # 滑点
-     "rateInHour": 0.000003,  # 杠杆利率
-     "entryOrders": 0.0008,  # 挂单手续费
-     "eatOrder": 0.001,  # 吃单手续费
-     "lever": 10,
-     "checkSurplus": 0.322,  # 止盈
-     "stopLoss": 0.169,  # 止损
-     "liability": 0.0,  # 负债
-     "instId": "BTC-USDT",
-               "name": '柳尚佐',
-               "bar": "1H",  # 粒度
-     "table_name": "BTC_USDT_1H",
-     "start_timestamp": "2019-11-1 00:00:00",
-     "end_timestamp": "2022-11-6 00:00:00"},
-    {"initFund": 5000000.0,  # 初始资金
-     "initCoin": 0.0,  # 初始币数量
-     "avgPx": 0.0,  # 开仓均价
-     "slippage": 0.0001,  # 滑点
-     "rateInHour": 0.000003,  # 杠杆利率
-     "entryOrders": 0.0008,  # 挂单手续费
-     "eatOrder": 0.001,  # 吃单手续费
-     "lever": 10,
-     "checkSurplus": 0.422,  # 止盈
-     "stopLoss": 0.169,  # 止损
-     "liability": 0.0,  # 负债
-     "instId": "BTC-USDT",
-               "name": '柳尚佐',
-               "bar": "2H",  # 粒度
-               "table_name": "BTC_USDT_2H",
-     "start_timestamp": "2019-11-1 20:00:00",
-     "end_timestamp": "2022-11-6 00:00:00"},
-]
-
 
 class Main:
     def __init__(self):
@@ -78,13 +42,22 @@ class Main:
     def start(self):
         self.event_engine.start()
         # 同步的
-        self.analysis.start()
-        self.back_test.start(TEST_GROUP)
+        test_group = self.analysis.get_test_config(*self.get_analysis_params())
+        self.back_test.start(test_group)
+        
         self.on_end()
 
     def on_end(self):
         self.event_engine.stop()
-        print('都关闭了')
+
+    # 获得回测数据参数
+    def get_analysis_params(self):
+        bar_config = [*BAR_CONFIG]
+        cs_scope = {**CHECK_SURPLUS_SCOPE}
+        sl_scope = {**STOP_LOSS_SCOPE}
+        base_config = {**VAR_CONFIG, **BASE_CONFIG}
+
+        return (bar_config, cs_scope, sl_scope, base_config)
 
 
 if __name__ == "__main__":
