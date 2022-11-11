@@ -103,7 +103,7 @@ class TradingEngine:
             _k = pd.DataFrame([kline_data]).astype(float)
             _k.columns = [
                 'id_tamp', 'open_price', 'high_price', 'lowest_price',
-                'close_price', 'vol', 'volCcy'
+                'close_price', 'vol', 'volCcy', 'volCcyQuote'
             ]
             KLINE_DATA = _k.to_dict('records')[0]
             # 准备数据-macd
@@ -180,5 +180,3 @@ class TradingEngine:
         self.macd = MACD_DATA['macd']
         return MACD_DATA
 
-
-# 工具查询---buy/sell阶段-数量
