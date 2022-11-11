@@ -5,7 +5,6 @@ from pymysql.cursors import SSCursor
 from dbutils.pooled_db import PooledDB
 import logging
 from events.engine import Event
-from events.event import K_LINE_DATA
 from logging import Logger, INFO, ERROR, DEBUG
 from json import loads, dumps
 
@@ -13,13 +12,13 @@ from json import loads, dumps
 
 
 class BaseSql:
-    def __init__(self, event_engine, ip, user_name, user_pass, db_name, charset='utf8'):
+    def __init__(self,  ip, user_name, user_pass, db_name, charset='utf8'):
         self.ip = ip
         self.user_name = user_name
         self.user_pass = user_pass
         self.db_name = db_name
         self.charset = charset
-        self.event_engine = event_engine
+        self.logger: Logger = logging.getLogger()
 
         self.POOL = PooledDB(
             pymysql,  # 使用链接数据库的模块
@@ -98,17 +97,11 @@ class BaseSql:
 
         return text
 
-    # 推送事件
-    def _put(self, type, data):
-        event = Event(type, data)
-        self.event_engine.put(event)
-
 
 class Sql(BaseSql):
-    def __init__(self, event_engine, ip, user_name, user_pass, db_name, charset='utf8'):
-        BaseSql.__init__(self, event_engine, ip, user_name,
+    def __init__(self, ip, user_name, user_pass, db_name, charset='utf8'):
+        BaseSql.__init__(self, ip, user_name,
                          user_pass, db_name, charset)
-        self.logger: Logger = logging.getLogger()
 
     # 插入表内容
     def insert_kline_data(self, data, table):
@@ -136,11 +129,8 @@ class Sql(BaseSql):
         ss_cursor, conn = self.connect(ss_cursor=True)
         # 执行sql语句
         ss_cursor.execute(sql)
-        while True:
-            total = ss_cursor.fetchone()
-            if not total:
-                break
-            self._put(K_LINE_DATA, total)
+        ss_cursor.fetchone()
+           
 
     def is_table_exist(self, table_name):
         sql = "SELECT count(*) num FROM information_schema.TABLES WHERE table_schema = '{database_name}' AND table_name = '{table_name}' AND table_type = 'BASE TABLE'".format(

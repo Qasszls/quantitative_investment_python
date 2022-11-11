@@ -17,27 +17,25 @@ from events.event import EVENT_TICK, EVENT_POSITION, EVENT_ACCOUNT, EVENT_LOG
 from logging import INFO
 
 
-class TestEngine:
+class TradingEngine:
     def __init__(self,
-                 exchange_engine: Exchange,
+                 exchange: Exchange,
                  config=None):
         if not config:
             print('请填写用户信息')
             return
 
         self.timestamp = Timestamp()  # 初始化时间操作对象
-        self.exchange_engine = exchange_engine  # 交易所引擎
-        self.event_engine = exchange_engine.event_engine
+        self.exchange = exchange  # 交易所引擎
 
-        self.checkSurplus = 0.337  # 玩家止盈率
-        self.stopLoss = 0.142  # 玩家止损率
+        self.checkSurplus = config['checkSurplus']  # 玩家止盈率
+        self.stopLoss = config['stopLoss']  # 玩家止损率
         self.lever = 10  # 杠杆倍数
         self.update_times = 0
         self.tick_times = 0
         self.config = config
 
-        self.simple_macd = SimpleMacd(
-            self.event_engine, computed=self.computed)
+        self.simple_macd = SimpleMacd(computed=self.computed)
 
         # 内部变量
         self.buy_times = 0
@@ -47,28 +45,29 @@ class TestEngine:
         self.dea = 0
         self.old_kl = []
 
-    def start(self):
+        self.register()
+
+    def register(self):
         # 监听数据回调
-        self.exchange_engine.register(EVENT_TICK, self.breathing)
-        self.exchange_engine.register(EVENT_POSITION, self.update_position)
-        self.exchange_engine.register(EVENT_ACCOUNT, self.update_account)
-        # # 监听策略回调
-        # self.event_engine.register(EVENT_COMPUTED, self.computed)
+        self.exchange.register(EVENT_TICK, self.breathing)
+        self.exchange.register(EVENT_POSITION, self.update_position)
+        self.exchange.register(EVENT_ACCOUNT, self.update_account)
 
     # 获取用户信息
+
     def update_account(self, event):
         data = event.data['data'][0]
         time = data['timestamp']
         money = data['details'][0]['availBal']  # 目前可用资产
-        equity = self.exchange_engine.user.availPos * \
-            self.exchange_engine.market.close - self.exchange_engine.user.liability + \
-            self.exchange_engine.user.margin_lever  # 权益类资产
+        equity = self.exchange.user.availPos * \
+            self.exchange.market.close - self.exchange.user.liability + \
+            self.exchange.user.margin_lever  # 权益类资产
         total = equity + money  # 总资产
 
         fund = self.config['initFund']  # 初始资金
         uplRatio = "%.2f" % ((total-fund)/fund*100)  # 收益率
-        print('目前总资产: {total}, 总收益率: {uplRatio}%, 可用资产{money}; {time}'.format(
-            uplRatio=uplRatio, total=total, money=money, time=self.timestamp.get_time_normal(time)))
+        # print('{name},目前总资产: {total}, 总收益率: {uplRatio}%, 可用资产{money}; {time}'.format(
+        #     uplRatio=uplRatio, total=total, name=self.config['table_name'], money=money, time=self.timestamp.get_time_normal(time)))
 
     # 更新持仓数据
     def update_position(self, event):
@@ -114,6 +113,7 @@ class TestEngine:
                 self.tick_times = self.tick_times + 1
                 return
             # 运行策略 *********** door **************
+
             self.simple_macd.runStrategy(
                 KLINE_DATA,
                 MACD_DATA
@@ -121,8 +121,8 @@ class TestEngine:
             self.old_kl = kline_data
 
     # 钩子函数 计算完成
-    def computed(self, res):
-        data = res.data
+
+    def computed(self, data):
         medium_status = data['medium_status']  # 初级判断状态
         if medium_status and self.buy_times <= 2:
             # 买入 钩子
@@ -131,14 +131,14 @@ class TestEngine:
     # 下单
     def allBuy(self):
         # 用户最大可买
-        count = self.exchange_engine.user.availBal * \
+        count = self.exchange.user.availBal * \
             0.15 / float(Market(self.old_kl).close) * self.lever
         # print('买点: ', self.timestamp.get_time_normal(self.old_kl[0]))
-        self.exchange_engine.buy(count)
+        self.exchange.buy(count)
 
     def allSell(self):
         # print('卖点', self.timestamp.get_time_normal(self.old_kl[0]))
-        self.exchange_engine.sell()
+        self.exchange.sell()
 
     def _before_investment(self, kline_data):
         # 私有函数
@@ -180,11 +180,3 @@ class TestEngine:
         self.macd = MACD_DATA['macd']
         return MACD_DATA
 
-
-# 工具查询---buy/sell阶段-数量
-
-
-    def log(self, msg, level=INFO):
-        data = {'msg': msg, 'level': level}
-        event: Event = Event(EVENT_LOG, data)
-        self.event_engine.put(event)

@@ -21,6 +21,5 @@ EVENT_COMPUTED = 'eComputed'
 # 异常事件
 EVENT_ERROR = 'eError'
 
-K_LINE_DATA = "eklineData"
-# 爬虫数据响应
-SAVE_DATA = "esaveData"
+# 回测事件
+BACK_TEST = 'eBackTest'
