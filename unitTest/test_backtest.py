@@ -24,10 +24,10 @@ class test_backtest_trading(unittest.TestCase):
     def setUp(self):
         # 测试数据
         self.config = ConfigEngine().get_config()
-        self.event_engine = EventEngine()
         self.user = UserInfo({**self.config, **CONFIG})
-        self.market = Market(M1)
-        self.analysis = AnalysisEngine(event_engine=self.event_engine)
+        self.market = Market()
+        self.market.update_tick(M1)
+        self.analysis = AnalysisEngine()
 
     # 用户购买
     def test_user_buy(self):
@@ -106,8 +106,16 @@ class test_backtest_trading(unittest.TestCase):
             for item in list:
                 res.append(item[type])
             return res
-        
-        bar_config = ['1H']
+
+        def get_length(scope):
+            _len = 0
+            cursor = scope['min']
+            while cursor <= scope['max']:
+                _len += 1
+                cursor += scope['up']
+            return _len
+
+        bar_config = ['1H', '2H']
         cs_scope = {'min': 1, 'max': 2, 'up': 1}
         sl_scope = {'min': 0.5, 'max': 1, 'up': 0.5}
         base_config = {**VAR_CONFIG, **BASE_CONFIG}
@@ -115,11 +123,12 @@ class test_backtest_trading(unittest.TestCase):
         config_group: list = self.analysis.get_test_config(
             bar_config=bar_config, cs_scope=cs_scope, sl_scope=sl_scope, base_config=base_config)
 
-        expect_length = 4
+        expect_length = get_length(
+            cs_scope)*len(bar_config) + len(bar_config) * get_length(sl_scope)
 
-        expect_check_surplus = [1, 1, 2, 2]
+        expect_check_surplus = [1, 1, 2, 2, 1, 1, 2, 2]
         check_surplus_list = get_list_type(config_group, 'checkSurplus')
-        expect_stop_loss = [0.5, 1, 0.5, 1]
+        expect_stop_loss = [0.5, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.0]
         stop_loss_list = get_list_type(config_group, 'stopLoss')
 
         self.assertTrue(len(config_group) == expect_length, msg="回测配置数据错误：{error}, 预期数据为{expect}".format(
@@ -132,3 +141,28 @@ class test_backtest_trading(unittest.TestCase):
         self.assertTrue(expect_stop_loss == stop_loss_list,
                         msg="回测配置止损率增速错误：{error}, 预期数据为{expect}".format(
                             error=stop_loss_list, expect=expect_stop_loss))
+
+    # 导出excel
+    def test_write_excel(self):
+        columns = ['总资产', '收益率']
+        col1 = ['1000', '0.1']
+        col2 = ['2000', '0.2']
+        file_name = 'test.xlsx'
+        self.analysis._write_excel(
+            file_name=file_name, columns=columns, cols_data=[col1, col2])
+
+        data = self.analysis._read_from_excel(
+            file_name=file_name, dtype={'总资产': 'str', '收益率': 'str'})
+        columns = data.columns.to_list()
+        analysis_list = data.to_numpy().tolist()
+
+        expect_columns = ['总资产', '收益率']
+        expect_list = [['1000', '0.1'], ['2000', '0.2']]
+        expect_length = 2
+
+        self.assertTrue(expr=columns == expect_columns, msg="excel列名写入错误, 错误数据: {err}, 预期数据: {exp}".format(
+            err=columns, exp=expect_columns))
+        self.assertTrue(expr=analysis_list == expect_list, msg="excel数据写入错误, 错误数据: {err}, 预期数据: {exp}".format(
+            err=analysis_list, exp=expect_list))
+        self.assertTrue(expr=len(analysis_list) == expect_length, msg="excel写入条目数量错误,错误数据 {err}, 预期数据: {exp}".format(
+            err=len(columns), exp=expect_length))

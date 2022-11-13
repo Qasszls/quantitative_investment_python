@@ -2,9 +2,11 @@ import time
 from events.event import EVENT_TICK, EVENT_POSITION, EVENT_ACCOUNT, EVENT_LOG
 from events.engine import Event, EventEngine
 from share.utils import to_json_parse, to_json_stringify, is_pass, get_time_stamp
-from backtest.constants import AnalysisStructure, PositionsStructure, AccountStructure, TABLE_NOT_EXITS, Market, BUY, SELL
+from backtest.constants import PositionsStructure, AccountStructure, TABLE_NOT_EXITS, Market, BUY, SELL
 import logging
 from logging import ERROR, INFO, Logger
+import traceback
+from backtest.analysis import DataRecordEngine
 
 
 class UserInfo:
@@ -21,9 +23,6 @@ class UserInfo:
         self.lever = config['lever']
         # 用户资产字段
         self.availBal = config['initFund']  # 用户可用资产
-        # 统计用户战斗力
-        self.win_times = 0
-        self.game_times = 0
 
     # 保证金变动
     def margin_lever_change(self, money):
@@ -81,12 +80,6 @@ class UserInfo:
 
             availBal = earnings + self.availBal + self.margin_lever   # 剩余可用
 
-            # 数据统计，计算 买一次算玩一次
-            self.game_times = self.game_times + 1
-            # 买入价小于卖出价，就算赢
-            self.win_times = self.win_times + \
-                1 if market_asset > current_asset else self.win_times
-
         self.positions_change(
             uplRatio=uplRatio, availPos=availPos, avgPx=avgPx)
         self.account_change(availBal=availBal,
@@ -141,12 +134,15 @@ class Exchange:
         self.config = config
         self.table_name = config['table_name']
         # 行情信息
-        self.market = {}
+        self.market: Market = Market()
         self.start_timestamp = get_time_stamp(config['start_timestamp'])
         self.end_timestamp = get_time_stamp(config['end_timestamp'])
         # 账户信息
-        self.user = UserInfo(
+        self.user: UserInfo = UserInfo(
             config)
+        #　用户数据记录 混入式设计模式
+        self.record: DataRecordEngine = DataRecordEngine(
+            user=self.user, market=self.market, config=config)
         # 事件表
         self.event_dict = {
             EVENT_TICK: "",
@@ -155,15 +151,11 @@ class Exchange:
         }
 
     def start(self):
-        self.logger.log(
-            level=INFO, msg="开始执行{name}回测程序".format(name=self.table_name))
         # 开启回测函数
         self.start_back_test()
         # 整理回测数据
-        current_uplRatio = self.get_user_uplRatio()
-        data = AnalysisStructure(
-            {'win_times': self.user.win_times, 'game_times': self.user.game_times, 'uplRatio': current_uplRatio, 'config': self.config})
-        return data
+        self.record.count_current_upl_ratio()
+        return self.record
 
     # 开始回测
     def start_back_test(self):
@@ -190,6 +182,10 @@ class Exchange:
     # 出售
     def sell(self, count=0):
         if count == 0:
+            # 记录胜率(因为需要当前的平均持仓，所以要在售卖动作钱执行)
+            self.record.set_win_times_info()  
+            # 记录本次收益
+            self.record.set_current_return()
             # 全部出售
             self.user.user_trading(price=self.market.close, type=SELL)
         else:
@@ -203,14 +199,14 @@ class Exchange:
         """
         try:
             # 更新当前行情信息
-            self.market = Market(tick)
+            self.market.update_tick(tick)
             # 先更新持仓和用户资产信息
             self.on_positions()
             self.on_account()
             # 再触发行情事件 将实例对象转为数组
             self.process(EVENT_TICK, list(self.market.k_line_data))
         except Exception as e:
-            self.logger.log(level=ERROR, msg=str(e))
+            self.logger.log(level=ERROR, msg=traceback.format_exc())
 
     def on_positions(self) -> None:
         """
@@ -241,15 +237,3 @@ class Exchange:
     def process(self, event_name, data):
         if self.event_dict[event_name]:
             self.event_dict[event_name](Event(event_name, data))
-
-    # 获得用户收益率
-    def get_user_uplRatio(self):
-        equity = self.user.availPos * \
-            self.market.close - self.user.liability + \
-            self.user.margin_lever  # 权益类资产
-        total = equity + self.user.availBal  # 总资产
-
-        fund = self.config['initFund']  # 初始资金
-        current_uplRatio = (total-fund)/fund  # 收益率
-
-        return current_uplRatio

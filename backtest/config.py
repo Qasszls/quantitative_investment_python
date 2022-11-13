@@ -1,7 +1,10 @@
-BAR_CONFIG = ['1H'] # , '30m', '15m', '1D', '4H', '2H'
+# , '30m', '15m', '1D', '4H', '2H'
+BAR_CONFIG = ['1H']
 
-CHECK_SURPLUS_SCOPE = {'min': 1.2, 'max': 2.2, 'up': 0.2}  # 最小止盈，最大止盈，止盈变化粒度
-STOP_LOSS_SCOPE = {'min': 0.32, 'max': 0.32, 'up': 2}  # 最小止损，最大止损，止损变化粒度
+CHECK_SURPLUS_SCOPE = {'min': 0.2, 'max': 0.2, 'up': 0.05}  # 最小止盈，最大止盈，止盈变化粒度
+STOP_LOSS_SCOPE = {'min': 0.22, 'max': 0.22, 'up': 0.05}  # 最小止损，最大止损，止损变化粒度
+# CHECK_SURPLUS_SCOPE = {'min': 0.35, 'max': 4.5, 'up': 0.05}  # 最小止盈，最大止盈，止盈变化粒度
+# STOP_LOSS_SCOPE = {'min': 0.22, 'max': 1.12, 'up': 0.1}  # 最小止损，最大止损，止损变化粒度
 
 VAR_CONFIG = {
     "slippage": 0.0001,  # 滑点
@@ -18,11 +21,12 @@ BASE_CONFIG = {
     "avgPx": 0.0,  # 开仓均价
     "liability": 0.0,  # 负债
     "instId": "BTC-USDT",
-    "start_timestamp": "2020-1-1 20:00:00",
+    "start_timestamp": "2016-10-1 00:00:00",
+    # "start_timestamp": "2021-9-1 00:00:00",
     "end_timestamp": "2022-11-6 00:00:00",
-    "checkSurplus":0.322, # 默认止盈
-    "stopLoss": 0.169,# 默认止损
-    
+    "checkSurplus": 0.322,  # 默认止盈
+    "stopLoss": 0.169,  # 默认止损
+
     # "bar": "1H",  # 粒度
     # "table_name": "BTC_USDT_1H",
     # "start_timestamp": "2019-10-1 20:00:00",

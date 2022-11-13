@@ -4,10 +4,10 @@ __pycache__/
 *$py.class
 # C extensions
 *.so
-
+*.xlsx
 # Distribution / packaging
 .Python
-reports/
+*.html
 build/
 develop-eggs/
 dist/
