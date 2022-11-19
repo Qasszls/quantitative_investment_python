@@ -3,11 +3,8 @@
 # -*- coding:UTF-8 -*-
 from atexit import register
 from email import message
-from backtest.constants import Market
-import time
 import sys
 import emoji
-import numpy as np
 import pandas as pd
 from backtest.exchange import Exchange
 from share.TimeStamp import Timestamp
@@ -101,6 +98,7 @@ class TradingEngine:
             return
         else:
             _k = pd.DataFrame([kline_data]).astype(float)
+            
             _k.columns = [
                 'id_tamp', 'open_price', 'high_price', 'lowest_price',
                 'close_price', 'vol', 'volCcy', 'volCcyQuote'
@@ -132,7 +130,7 @@ class TradingEngine:
     def allBuy(self):
         # 用户最大可买
         count = self.exchange.user.availBal * \
-            0.15 / float(Market(self.old_kl).close) * self.lever
+            0.15 / float(self.old_kl[4]) * self.lever
         # print('买点: ', self.timestamp.get_time_normal(self.old_kl[0]))
         self.exchange.buy(count)
 

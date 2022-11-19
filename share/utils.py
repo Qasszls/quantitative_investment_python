@@ -5,7 +5,7 @@ import json
 import time
 from tqdm import tqdm
 from timeit import default_timer as timer
-
+import emoji
 
 
 def to_json_parse(data):
@@ -89,18 +89,18 @@ def get_divide(ms, unit, bar_val):
     return int(round(divide))
 
 
-# class DownloadBar:
-#     def __init__(self):
-#         self.bar = ''
+class ProgressBar:
+    def __init__(self):
+        self.bar = ''
 
-#     def update(self, count, limit):
-#         self.bar.set_description(
-#             emoji.emojize('本次传输剩余   {count}条   每次{limit}条 📆'.format(count=count, limit=limit)))
+    def update(self, limit, msg='进行中'):
+        self.bar.set_description(
+            emoji.emojize(msg))
 
-#         self.bar.update(limit)
+        self.bar.update(limit)
 
-#     def create_bar(self, *args, **kwargs):
-#         self.bar = tqdm(*args, **kwargs)
+    def create_bar(self, *args, **kwargs):
+        self.bar = tqdm(*args, **kwargs)
 
-#     def destroy_all(self):
-#         self.bar = ''
+    def destroy_all(self):
+        self.bar = ''

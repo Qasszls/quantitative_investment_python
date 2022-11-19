@@ -4,14 +4,11 @@
 import json
 import time
 import emoji
-from backtest.engine import TradingEngine
-from backtest.exchange import Exchange
 from backtest.analysis import AnalysisEngine
 from backtest.index import BackTest
-from datetime import datetime
 from backtest.config import BASE_CONFIG, VAR_CONFIG, BAR_CONFIG, CHECK_SURPLUS_SCOPE, STOP_LOSS_SCOPE
+from multiprocessing import Pipe, Pool
 
-from events.engine import EventEngine
 from message.engine import LogEngine
 from backtest.config import ConfigEngine
 
@@ -28,27 +25,37 @@ from events.event import EVENT_TICK
     拿到数据喂给策略，看看周期的收益结果
 """
 
+
+def task(config, left):
+    test: BackTest = BackTest()
+    test.run(config, left)
+
+
 class Main:
     def __init__(self):
-        self.event_engine = EventEngine()
+        left, right = Pipe()
+        self.left = left
+        self.pools = Pool(5)
         self.config_set = ConfigEngine()
         self.logger = LogEngine()
-
-        self.back_test = BackTest(self.event_engine)
-
-        self.analysis = AnalysisEngine(
-            self.event_engine)
+        self.analysis = AnalysisEngine(right)
 
     def start(self):
-        self.event_engine.start()
-        # 同步的
         test_group = self.analysis.get_test_config(*self.get_analysis_params())
-        self.back_test.start(test_group)
-        
+
+        # 同步的
+        for config in test_group:
+            self.pools.apply_async(task,
+                                   args=(config, self.left,))
+        total_test = len(test_group)
+        self.analysis.start(length=total_test)
+        self.pools.close()
+        self.pools.join()
         self.on_end()
 
     def on_end(self):
-        self.event_engine.stop()
+        self.analysis.export_report(
+            file_name='simpleMACDStrategy_earnings_report.xlsx')
 
     # 获得回测数据参数
     def get_analysis_params(self):

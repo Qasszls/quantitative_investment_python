@@ -43,7 +43,18 @@ class PositionsStructure:
 
 
 class Market:
-    def __init__(self, k_line_data) -> None:
+    def __init__(self) -> None:
+        self.k_line_data = []
+        self.timestamp = ''
+        self.open = 0.0
+        self.high = 0.0
+        self.low = 0.0
+        self.close = 0.0
+        self.vol = 0.0
+        self.volCcy = 0.0
+        self.volCcyQuote = 0.0
+
+    def update_tick(self, k_line_data):
         self.k_line_data = k_line_data
         self.timestamp = k_line_data[0]
         self.open = float(k_line_data[1])
@@ -52,11 +63,5 @@ class Market:
         self.close = float(k_line_data[4])
         self.vol = float(k_line_data[5])
         self.volCcy = float(k_line_data[6])
-
-
-class AnalysisStructure:
-    def __init__(self, data: dict):
-        self.win_times = data['win_times']
-        self.game_times = data['game_times']
-        self.uplRatio = data['uplRatio']
-        self.config = data['config']
+        self.volCcyQuote = float(k_line_data[7]) if len(
+            k_line_data) > 7 else ''
