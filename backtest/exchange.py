@@ -1,12 +1,14 @@
 import time
 from events.event import EVENT_TICK, EVENT_POSITION, EVENT_ACCOUNT, EVENT_LOG
 from events.engine import Event, EventEngine
-from share.utils import to_json_parse, to_json_stringify, is_pass, get_time_stamp
+from share.utils import to_json_parse, how_many_hours, is_pass, get_time_stamp
 from backtest.constants import PositionsStructure, AccountStructure, TABLE_NOT_EXITS, Market, BUY, SELL
 import logging
 from logging import ERROR, INFO, Logger
 import traceback
 from backtest.analysis import DataRecordEngine
+from backtest.SQLhandler import Sql
+import re
 
 
 class UserInfo:
@@ -15,7 +17,10 @@ class UserInfo:
         self.config = config
         self.margin_lever = 0.0  # 保证金
         self.liability = config['liability']  # 负债
+        self.interest = 0.0  # 利息
+        self.position_time = 0.0  # 持仓时间
         self.stopLoss = config['stopLoss']  # 止损
+        self.checkSurplus = config['checkSurplus']
         # 持仓字段
         self.uplRatio = 0.0  # 未实现收益率
         self.avgPx = config['avgPx']  # 开仓均价
@@ -44,7 +49,21 @@ class UserInfo:
         if availPos != None:
             self.availPos = availPos  # 设置可平仓数量
 
+    # 计算利息
+    def count_interest(self, time):
+        total_interest = self.position_time+time
+        if total_interest >= 1:
+            #　负债　乘以　每小时杠杆费率　乘以　持仓小时
+            deduct = self.liability * \
+                self.config['rateInHour'] * total_interest
+            self.interest += deduct
+            availBal = self.availBal - deduct
+            self.account_change(availBal=availBal)
+        else:
+            self.position_time = total_interest
+
     # 用户购买
+
     def user_trading(self, count: float = 0.0, price: float = 0.0, type: float = BUY):
         availBal = 0.0
         availPos = 0.0
@@ -73,12 +92,16 @@ class UserInfo:
             market_asset = real_price * self.availPos  # 仓位资产现价
             current_asset = self.avgPx * self.availPos  # 仓位资产买入价
             # 控制亏损
-            if current_asset != 0 and (market_asset-(current_asset))/(current_asset) <= -self.stopLoss:
-                market_asset = (current_asset)*(1-self.stopLoss)
+            # if current_asset != 0 and (market_asset-(current_asset))/(current_asset) <= -self.stopLoss:
+            #     market_asset = (current_asset)*(1-self.stopLoss+0.05)
+            # elif current_asset != 0 and (market_asset-(current_asset))/(current_asset) >=self.checkSurplus:
+            #     market_asset = (current_asset)*(1-self.stopLoss)
             service_charge = market_asset * self.config['eatOrder']  # 手续费
             earnings = market_asset - self.liability - service_charge  # 收益
-
             availBal = earnings + self.availBal + self.margin_lever   # 剩余可用
+
+            # 清空持仓时间
+            self.position_time = 0.0
 
         self.positions_change(
             uplRatio=uplRatio, availPos=availPos, avgPx=avgPx)
@@ -128,7 +151,7 @@ class Exchange:
 
     """
 
-    def __init__(self, sql_handler, config):
+    def __init__(self, sql_handler: Sql, config):
         self.sql_handler = sql_handler
         self.logger: Logger = logging.getLogger()
         self.config = config
@@ -149,12 +172,12 @@ class Exchange:
             EVENT_POSITION: "",
             EVENT_ACCOUNT: ""
         }
+        self.bar_val = int(re.findall('\d+', config['bar'])[0])
+        self.unit = re.findall('[a-zA-Z]', config['bar'])[0]
 
     def start(self):
         # 开启回测函数
         self.start_back_test()
-        # 整理回测数据
-        self.record.count_current_upl_ratio()
         return self.record
 
     # 开始回测
@@ -171,10 +194,12 @@ class Exchange:
             tick = ss_cursor.fetchone()
             if not tick:
                 # 关闭测试进程
+                self.sql_handler._close(cursor=ss_cursor, conn=conn)
                 break
             self.on_tick(tick)
 
     # 购买
+
     def buy(self, count):
         # 用户购买
         self.user.user_trading(count=count, price=self.market.close, type=BUY)
@@ -183,7 +208,7 @@ class Exchange:
     def sell(self, count=0):
         if count == 0:
             # 记录胜率(因为需要当前的平均持仓，所以要在售卖动作钱执行)
-            self.record.set_win_times_info()  
+            self.record.set_win_times_info()
             # 记录本次收益
             self.record.set_current_return()
             # 全部出售
@@ -201,8 +226,8 @@ class Exchange:
             # 更新当前行情信息
             self.market.update_tick(tick)
             # 先更新持仓和用户资产信息
-            self.on_positions()
             self.on_account()
+            self.on_positions()
             # 再触发行情事件 将实例对象转为数组
             self.process(EVENT_TICK, list(self.market.k_line_data))
         except Exception as e:
@@ -225,6 +250,11 @@ class Exchange:
         """
         Account event push.
         """
+        # 计算当前利息
+        self.user.count_interest(
+            how_many_hours(
+                unit=self.unit, bar_val=self.bar_val)
+        )
         account = self.user.get_account()
         account['data'][0]['timestamp'] = self.market.timestamp
         self.process(EVENT_ACCOUNT, account)

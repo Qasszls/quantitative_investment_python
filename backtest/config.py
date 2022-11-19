@@ -1,13 +1,13 @@
-# , '30m', '15m', '1D', '4H', '2H'
-BAR_CONFIG = ['1H']
+#  '2H', '30m', '15m',  '1D', '1H', '4H'
+BAR_CONFIG = ['2H', '30m', '15m',  '1D', '1H', '4H']
 
-CHECK_SURPLUS_SCOPE = {'min': 0.2, 'max': 0.2, 'up': 0.05}  # 最小止盈，最大止盈，止盈变化粒度
-STOP_LOSS_SCOPE = {'min': 0.22, 'max': 0.22, 'up': 0.05}  # 最小止损，最大止损，止损变化粒度
+CHECK_SURPLUS_SCOPE = {'min': 0.08, 'max': 2.61, 'up': 0.05}  # 最小止盈，最大止盈，止盈变化粒度
+STOP_LOSS_SCOPE = {'min': 0.08, 'max': 1.58, 'up': 0.05}  # 最小止损，最大止损，止损变化粒度
 # CHECK_SURPLUS_SCOPE = {'min': 0.35, 'max': 4.5, 'up': 0.05}  # 最小止盈，最大止盈，止盈变化粒度
 # STOP_LOSS_SCOPE = {'min': 0.22, 'max': 1.12, 'up': 0.1}  # 最小止损，最大止损，止损变化粒度
 
 VAR_CONFIG = {
-    "slippage": 0.0001,  # 滑点
+    "slippage": 0.0003,  # 滑点
     "rateInHour": 0.000003,  # 杠杆利率
     "entryOrders": 0.0008,  # 挂单手续费
     "eatOrder": 0.001,  # 吃单手续费
@@ -21,8 +21,8 @@ BASE_CONFIG = {
     "avgPx": 0.0,  # 开仓均价
     "liability": 0.0,  # 负债
     "instId": "BTC-USDT",
-    "start_timestamp": "2016-10-1 00:00:00",
-    # "start_timestamp": "2021-9-1 00:00:00",
+    # "start_timestamp": "2016-10-1 00:00:00",
+    "start_timestamp": "2022-9-1 00:00:00",
     "end_timestamp": "2022-11-6 00:00:00",
     "checkSurplus": 0.322,  # 默认止盈
     "stopLoss": 0.169,  # 默认止损

@@ -10,9 +10,9 @@ from logging import INFO, Logger, ERROR
 import pandas as pd
 import traceback
 import os
+from timeit import default_timer as timer
 from decimal import getcontext, Decimal
 from empyrical import max_drawdown
-from share.utils import ProgressBar, get_time_stamp
 
 # 设置最大小数位长度
 getcontext().prec = 4
@@ -37,7 +37,7 @@ class DataRecordEngine:
 
     # 获得用户当前收益率
     def count_current_upl_ratio(self):
-        total = self.count_current_user_total_fund().__float__()
+        total = self.count_current_user_total_fund()
         init_fund = self.config['initFund']  # 初始资金
         return (total-init_fund)/init_fund  # 收益率
 
@@ -55,20 +55,24 @@ class DataRecordEngine:
             self.user.margin_lever  # 权益类资产
         return equity + self.user.availBal  # 总资产
 
+    # 计算用户总工扣息
+    def count_account_interest_deduct(self):
+        return self.user.interest/self.count_positions_total_fund()
+
     # 设置胜率
     def set_win_times_info(self):
         self.game_times = self.game_times + 1
-        # 用户平均持仓价
-        sell_price = self.user.avgPx * \
-            (1 - self.config['slippage']) * (1 - self.config['eatOrder'])
+        market_asset = self.market.close * self.user.availPos  # 仓位资产现价
+        service_charge = market_asset * self.config['eatOrder']  # 手续费
+        earnings = market_asset - self.user.liability - service_charge  # 收益
+
         # 计算用户平均持仓价 和 当前产品价格
-        self.win_times = self.win_times + \
-            1 if (sell_price - self.market.close) > 0 else self.win_times
+        self.win_times = self.win_times + 1 if earnings > 0 else self.win_times
 
     # 设置资产最高峰和高峰后的低谷
     def set_current_return(self):
         _return = self.count_positions_total_fund() - self.count_current_user_total_fund()
-        self.history_returns.append(_return.__float__())
+        self.history_returns.append(_return)
         # 计算最大回撤率
 
     def count_maximum_drawdown_ratio(self):
@@ -76,51 +80,47 @@ class DataRecordEngine:
 
 
 class AnalysisEngine:
-    def __init__(self, right_pipe=None):
+    def __init__(self):
         self.Logger: Logger = logging.getLogger()
-        self.right_pipe = right_pipe
-        self.columns = ['条目名称', '总收益率', '胜率', '止盈率', '止损率']  # '最大回撤率',
-        self.cols = {
+        self.columns = ['条目名称', '总收益率', '胜率', '扣息', '止盈率', '止损率']  # '最大回撤率',
+        self.cols = {}
+        self.data_length_dict = {}
 
-        }
-        self.index = 0
-        self.progress: ProgressBar = ProgressBar()
-
-    def start(self, length):
-        self.progress.create_bar(total=length)
-        self.index = length
-        while True:
-            res = self.right_pipe.recv()
-            if res:
-                self.progress.update(1)
-                self.index -= 1
-                self.on_back_test(res)
-                if self.index == 0:
-                    break
-
-    def on_back_test(self, data):
+    def handle(self, record: DataRecordEngine):
         try:
-            record: DataRecordEngine = data
-            total_name = record.config['table_name']  # 表名称
-            win_ratio = record.count_current_win_times()  # 胜率
-            upl_ratio = record.count_current_upl_ratio()  # 收益率
-            bar = record.config['bar']
-            # maximum_drawdown = '%.2f' % record.count_maximum_drawdown_ratio()  # 最大回撤
-            if bar not in self.cols:
-                self.cols[bar] = []
-            self.cols[bar].append([total_name, upl_ratio, win_ratio,
-                                   record.config['checkSurplus'], record.config['stopLoss']])
-
+            self.on_back_test(record)
+            self.save_record(record)
         except Exception as e:
             self.Logger.log(
                 level=ERROR, msg='analysis.py 有问题啦'+traceback.format_exc())
 
-    def get_test_config(self, bar_config, cs_scope, sl_scope, base_config):
+    def on_back_test(self, data):
+        record: DataRecordEngine = data
+        total_name = record.config['table_name']  # 表名称
+        win_ratio = record.count_current_win_times()  # 胜率
+        upl_ratio = record.count_current_upl_ratio()  # 收益率
+        interest = record.count_account_interest_deduct()  # 总扣息率
+        bar = record.config['bar']
+        # maximum_drawdown = '%.2f' % record.count_maximum_drawdown_ratio()  # 最大回撤
+        if bar not in self.cols:
+            self.cols[bar] = []
+        self.cols[bar].append([total_name, upl_ratio, win_ratio, interest,
+                               record.config['checkSurplus'], record.config['stopLoss']])
 
+    # 保存行情数据
+    def save_record(self, record: DataRecordEngine):
+        bar = record.config['bar']
+        self.data_length_dict[bar] -= 1
+        if self.data_length_dict[bar] == 0:
+            self.export_report(
+                file_name='simpleMACDStrategy_earnings_report.xlsx', bar=bar)
+
+    # 获得回测数据素材
+    def get_test_config(self, bar_config, cs_scope, sl_scope, base_config):
         config_group = []
         # 循环采样粒度维度
-        config_group = self._get_bar_list(
-            config_group, bar_config, base_config)
+        config_group = self._set_bar_list(
+            bar_config, base_config)
         # 循环采样止盈率
         config_group = self._get_config_group(
             config_group, cs_scope, 'checkSurplus')
@@ -128,18 +128,37 @@ class AnalysisEngine:
         config_group = self._get_config_group(
             config_group, sl_scope, 'stopLoss')
 
+        # 计算各个粒度会被测量的数量总和
+        self._set_data_length_dict(bar_config=bar_config,
+                                   cs_scope=cs_scope, sl_scope=sl_scope)
+
         return config_group
 
-    def _get_bar_list(self, config_group: list, scope: list, base_config):
+    def _set_data_length_dict(self, bar_config, sl_scope, cs_scope):
+        def _get_group_length(scope):
+            _len = 0
+            cursor = scope['min']
+            while cursor <= scope['max']:
+                _len += 1
+                cursor += scope['up']
+            return _len
+
+        sl_scope_length = _get_group_length(sl_scope)
+        cs_scope_length = _get_group_length(cs_scope)
+        for bar in bar_config:
+            self.data_length_dict[bar] = sl_scope_length*cs_scope_length
+
+    # 为测试数据素材配置粒度相关信息
+    def _set_bar_list(self, scope: list, base_config):
+        group = []
         for bar in scope:
             config = {**base_config}
             config['bar'] = bar
             config['table_name'] = 'BTC_USDT_{bar}'.format(bar=bar)
-            config_group.append(config)
+            group.append(config)
+        return group
 
-        return config_group
     # 获取格式化的配置组
-
     def _get_config_group(self, config_group, scope, type):
         new_group = []
         cursor = scope['min']
@@ -159,20 +178,20 @@ class AnalysisEngine:
     def _write_excel(self, file_name, cols_data,  sheet_name='test.xlsx', columns=None):
         df = pd.DataFrame(
             data=cols_data, columns=columns if columns else self.columns)
-        
+
         if not os.path.exists(file_name):
-            df.to_excel(file_name, encoding='GBK', index=False)
+            df.to_excel(file_name, sheet_name=sheet_name,
+                        encoding='GBK', index=False)
         else:
             with pd.ExcelWriter(file_name, engine='openpyxl', mode='a') as writer:
                 df.to_excel(writer, sheet_name=sheet_name,
                             index=False)
                 writer.save()
 
-    def export_report(self, file_name):
-        for key in self.cols.keys():
-            self._write_excel(file_name=file_name,
-                              cols_data=self.cols[key], sheet_name=key)
-         # 画图
+    def export_report(self, file_name, bar):
+        self._write_excel(file_name=file_name,
+                          cols_data=self.cols[bar], sheet_name=bar)
+        # 画图
         # def stacked_area_plot(self):
         #     # Create data
         #     x = range(1, 6)
