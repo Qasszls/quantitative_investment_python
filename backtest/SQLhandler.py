@@ -23,8 +23,8 @@ class BaseSql:
         self.POOL = PooledDB(
             pymysql,  # 使用链接数据库的模块
             maxconnections=0,  # 连接池允许的最大连接数，0和None表示不限制连接数
-            mincached=2,  # 初始化时，链接池中至少创建的空闲的链接，0表示不创建
-            maxcached=10,  # 链接池中最多闲置的链接，0和None不限制
+            mincached=0,  # 初始化时，链接池中至少创建的空闲的链接，0表示不创建
+            maxcached=1,  # 链接池中最多闲置的链接，0和None不限制
             blocking=True,  # 连接池中如果没有可用连接后，是否阻塞等待。True，等待；False，不等待然后报错
             maxusage=None,  # 一个链接最多被重复使用的次数，None表示无限制
             # setsession=[],  # 开始会话前执行的命令列表。如：["set datestyle to ...", "set time zone ..."]
@@ -37,9 +37,6 @@ class BaseSql:
             db=self.db_name,
             charset=self.charset,
             use_unicode=True)
-
-    # def __del__(self):
-    #     self._close()
 
     def connect(self, ss_cursor=False):
         cursor = ''
@@ -130,7 +127,6 @@ class Sql(BaseSql):
         # 执行sql语句
         ss_cursor.execute(sql)
         ss_cursor.fetchone()
-           
 
     def is_table_exist(self, table_name):
         sql = "SELECT count(*) num FROM information_schema.TABLES WHERE table_schema = '{database_name}' AND table_name = '{table_name}' AND table_type = 'BASE TABLE'".format(

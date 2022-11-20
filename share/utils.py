@@ -40,9 +40,8 @@ def is_pass(input):
     else:
         return False
 
-    # 将时间粒度换算成毫秒值
 
-
+# 将时间粒度换算成毫秒值
 def timestamp_to_ms(unit, bar_val):
     divide = ''
     if unit == 'm':
@@ -59,16 +58,27 @@ def timestamp_to_ms(unit, bar_val):
         divide = bar_val * 12 * 24 * 30 * 60 * 60 * 1000
     return int(round(divide))
 
-    # 根据粒度换算出一共需要请求多少次
+
+# 换算等于多少个小时
+def how_many_hours(unit, bar_val):
+    divide = ''
+    if unit == 'm':
+        divide = bar_val / 60
+    elif unit == 'H':
+        divide = bar_val / 1
+    elif unit == 'D':
+        divide = bar_val * 24
+    return int(round(divide))
 
 
+# 根据粒度换算出一共需要请求多少次
 def get_divide(ms, unit, bar_val):
     """根据粒度换算出一共需要请求多少次
 
     Args:
         unit (str): 时间粒度单位
         ms (int): 毫秒级时间段
-        val (int): 时间粒度值
+        bar_val (int): 时间粒度值
 
     Returns:
         int: 次数

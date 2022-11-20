@@ -7,11 +7,11 @@ import emoji
 from backtest.analysis import AnalysisEngine
 from backtest.index import BackTest
 from backtest.config import BASE_CONFIG, VAR_CONFIG, BAR_CONFIG, CHECK_SURPLUS_SCOPE, STOP_LOSS_SCOPE
-from multiprocessing import Pipe, Pool
-
+from multiprocessing import Pool
+import os
 from message.engine import LogEngine
 from backtest.config import ConfigEngine
-
+from share.utils import ProgressBar, get_time_stamp
 # test 随时删除
 from events.event import EVENT_TICK
 
@@ -26,38 +26,37 @@ from events.event import EVENT_TICK
 """
 
 
-def task(config, left):
+def task(config):
     test: BackTest = BackTest()
-    test.run(config, left)
+    return test.run(config)
 
 
 class Main:
     def __init__(self):
-        left, right = Pipe()
-        self.left = left
-        self.pools = Pool(5)
+        self.pools = Pool(processes=os.cpu_count()-1)
         self.config_set = ConfigEngine()
         self.logger = LogEngine()
-        self.analysis = AnalysisEngine(right)
+        self.progress: ProgressBar = ProgressBar()
+        self.analysis = AnalysisEngine()
 
     def start(self):
         test_group = self.analysis.get_test_config(*self.get_analysis_params())
-
+        self.progress.create_bar(total=len(test_group))
         # 同步的
         for config in test_group:
             self.pools.apply_async(task,
-                                   args=(config, self.left,))
-        total_test = len(test_group)
-        self.analysis.start(length=total_test)
+                                   args=(config,), error_callback=self.on_error, callback=self.on_success)
         self.pools.close()
         self.pools.join()
-        self.on_end()
 
-    def on_end(self):
-        self.analysis.export_report(
-            file_name='simpleMACDStrategy_earnings_report.xlsx')
-
+    def on_error(self, err):
+        print('on_error', err)
     # 获得回测数据参数
+
+    def on_success(self, record):
+        self.analysis.handle(record)
+        self.progress.update(1)
+
     def get_analysis_params(self):
         bar_config = [*BAR_CONFIG]
         cs_scope = {**CHECK_SURPLUS_SCOPE}

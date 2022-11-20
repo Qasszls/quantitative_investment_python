@@ -124,7 +124,7 @@ class test_backtest_trading(unittest.TestCase):
             bar_config=bar_config, cs_scope=cs_scope, sl_scope=sl_scope, base_config=base_config)
 
         expect_length = get_length(
-            cs_scope)*len(bar_config) + len(bar_config) * get_length(sl_scope)
+            cs_scope)*len(bar_config) * get_length(sl_scope)
 
         expect_check_surplus = [1, 1, 2, 2, 1, 1, 2, 2]
         check_surplus_list = get_list_type(config_group, 'checkSurplus')

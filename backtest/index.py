@@ -6,7 +6,6 @@ from backtest.crawler import OkxCrawlerEngine
 from backtest.SQLhandler import Sql
 from backtest.engine import TradingEngine
 from backtest.exchange import Exchange
-from events.event import BACK_TEST
 
 """
     trading模块
@@ -24,7 +23,7 @@ class BackTest:
                                'QASS-utf-8', 'quant')
         self.logger: Logger = logging.getLogger()
 
-    def run(self, config, left_pipe):
+    def run(self, config):
         try:
             exchange, crawler = self.get_base_module(config=config)
             # 检查数据
@@ -35,7 +34,7 @@ class BackTest:
             # 执行策略
             analysis_data = exchange.start()
             # 扔出数据
-            left_pipe.send(analysis_data)
+            return analysis_data
         except Exception as e:
             print('back_test.run error: {err}'.format(
                 err=traceback.format_exc()))
