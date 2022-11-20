@@ -1,130 +1,14 @@
 {
-  "task_library": [
-    {
-      "table": "2020_kline_1m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "1",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_1m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_3m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "3",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_3m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "3",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_5m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "5",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_5m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "5",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_15m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "15",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_15m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "15",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_30m",
-      "times": [1609430399000, 1577807999000],
-      "bar": "30",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_30m",
-      "times": [1577807999000, 1546271999000],
-      "bar": "30",
-      "_bar_unit": "m",
-      "limit": "100"
-    },
-    { 
-      "table": "2020_kline_1H",
-      "times": [1609430399000, 1577807999000], 
-      "bar": "1",
-      "_bar_unit": "H",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_1H",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "H",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_1D",
-      "times": [1609430399000, 1577807999000],
-      "bar": "1",
-      "_bar_unit": "D",
-      "limit": "100"
-    },
-    {
-      "table": "2019_kline_1D",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "D",
-      "limit": "100"
-    },
-    {
-      "table": "2020_kline_1W",
-      "times": [1609430399000, 1577807999000],
-      "bar": "1",
-      "_bar_unit": "W",
-      "limit": "1"
-    },
-    {
-      "table": "2019_kline_1W",
-      "times": [1577807999000, 1546271999000],
-      "bar": "1",
-      "_bar_unit": "W",
-      "limit": "1"
-    }
-  ],
-  "filter":["1D"],
-  "DBName":"BTC-USDT_kline",
   "symbol": "BTC-USDT",
   "realPay":{
-      "host":"https://www.okex.com",
+      "host":"https://www.okx.com",
       "api_key" :"bdedd431-4ee7-494b-b539-cc10f1a1cdef",
       "secret_key" :"7619D4450F512E462CEE4C0579E083F3",
       "passphrase" :"Qass-utf-8", 
       "table_name":"realPay_15m",
       "name":"realPay",
       "note":"主账户",
-      "market_lv":"candle5m",
+      "market_lv":"candle1H",
       "trading_type":"1", 
       "symbol": "BTC-USDT",
       "subscribe": {

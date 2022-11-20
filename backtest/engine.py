@@ -63,8 +63,6 @@ class TradingEngine:
 
         fund = self.config['initFund']  # 初始资金
         uplRatio = "%.2f" % ((total-fund)/fund*100)  # 收益率
-        # print('{name},目前总资产: {total}, 总收益率: {uplRatio}%, 可用资产{money}; {time}'.format(
-        #     uplRatio=uplRatio, total=total, name=self.config['table_name'], money=money, time=self.timestamp.get_time_normal(time)))
 
     # 更新持仓数据
     def update_position(self, event):
@@ -90,6 +88,7 @@ class TradingEngine:
 
     def breathing(self, kline_event):
         kline_data = kline_event.data
+
         # 判断新老数据
         # 第一次进入循环 或者 同一时间的老数据，都会进入
         if kline_data[0] in self.old_kl:
@@ -98,7 +97,7 @@ class TradingEngine:
             return
         else:
             _k = pd.DataFrame([kline_data]).astype(float)
-            
+
             _k.columns = [
                 'id_tamp', 'open_price', 'high_price', 'lowest_price',
                 'close_price', 'vol', 'volCcy', 'volCcyQuote'
@@ -119,7 +118,6 @@ class TradingEngine:
             self.old_kl = kline_data
 
     # 钩子函数 计算完成
-
     def computed(self, data):
         medium_status = data['medium_status']  # 初级判断状态
         if medium_status and self.buy_times <= 2:
@@ -177,4 +175,3 @@ class TradingEngine:
         self.dea = MACD_DATA['dea']
         self.macd = MACD_DATA['macd']
         return MACD_DATA
-

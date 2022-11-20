@@ -30,6 +30,7 @@ class DataRecordEngine:
         self.user = user
         self.market: Market = market
         self.history_returns = []
+        self.max_positions_weight = 0.0
 
     # 获得策略当前胜率
     def count_current_win_times(self):
@@ -37,27 +38,32 @@ class DataRecordEngine:
 
     # 获得用户当前收益率
     def count_current_upl_ratio(self):
-        total = self.count_current_user_total_fund()
+        total = self.count_current_user_net_assets()
         init_fund = self.config['initFund']  # 初始资金
         return (total-init_fund)/init_fund  # 收益率
 
-    # 计算用户当前总资产
-    def count_current_user_total_fund(self):
+    # 计算用户当前净总资产
+    def count_current_user_net_assets(self):
         equity = self.user.availPos * \
-            self.market.close - self.user.liability + \
-            self.user.margin_lever  # 权益类资产
+            self.market.close - self.user.liability   # 收益
+        return equity + self.user.availBal  # 总资产 = 收益+可用月
+
+    # 计算用户持仓的净资产
+    def count_positions_net_assets(self):
+        equity = self.user.availPos * \
+            self.user.avgPx - self.user.liability   # 权益类资产
         return equity + self.user.availBal  # 总资产
 
-    # 计算用户持仓时总资产
-    def count_positions_total_fund(self):
-        equity = self.user.availPos * \
-            self.user.avgPx - self.user.liability + \
-            self.user.margin_lever  # 权益类资产
-        return equity + self.user.availBal  # 总资产
+    # 计算用户仓位风险
+    def set_positions_weight(self):
+        availBal = self.user.availBal
+        weight = (self.count_current_user_net_assets()-availBal) / \
+            self.count_current_user_net_assets()
+        self.max_positions_weight = weight if self.max_positions_weight < weight else self.max_positions_weight
 
     # 计算用户总工扣息
     def count_account_interest_deduct(self):
-        return self.user.interest/self.count_positions_total_fund()
+        return self.user.interest/self.count_positions_net_assets()
 
     # 设置胜率
     def set_win_times_info(self):
@@ -65,16 +71,15 @@ class DataRecordEngine:
         market_asset = self.market.close * self.user.availPos  # 仓位资产现价
         service_charge = market_asset * self.config['eatOrder']  # 手续费
         earnings = market_asset - self.user.liability - service_charge  # 收益
-
         # 计算用户平均持仓价 和 当前产品价格
         self.win_times = self.win_times + 1 if earnings > 0 else self.win_times
 
     # 设置资产最高峰和高峰后的低谷
     def set_current_return(self):
-        _return = self.count_positions_total_fund() - self.count_current_user_total_fund()
+        _return = self.count_positions_net_assets() - self.count_current_user_net_assets()
         self.history_returns.append(_return)
-        # 计算最大回撤率
 
+    # 计算最大回撤率
     def count_maximum_drawdown_ratio(self):
         return max_drawdown(np.array(self.history_returns))
 
@@ -82,7 +87,8 @@ class DataRecordEngine:
 class AnalysisEngine:
     def __init__(self):
         self.Logger: Logger = logging.getLogger()
-        self.columns = ['条目名称', '总收益率', '胜率', '扣息', '止盈率', '止损率']  # '最大回撤率',
+        self.columns = ['条目名称', '总收益率', '胜率', '交易次数', '扣息',
+                        '用户持仓风险', '止盈率', '止损率']  # '最大回撤率',
         self.cols = {}
         self.data_length_dict = {}
 
@@ -98,13 +104,15 @@ class AnalysisEngine:
         record: DataRecordEngine = data
         total_name = record.config['table_name']  # 表名称
         win_ratio = record.count_current_win_times()  # 胜率
+        game_times = record.game_times  # 游戏次数
         upl_ratio = record.count_current_upl_ratio()  # 收益率
         interest = record.count_account_interest_deduct()  # 总扣息率
+        positions_weight = record.max_positions_weight  # 用户持仓风险
         bar = record.config['bar']
         # maximum_drawdown = '%.2f' % record.count_maximum_drawdown_ratio()  # 最大回撤
         if bar not in self.cols:
             self.cols[bar] = []
-        self.cols[bar].append([total_name, upl_ratio, win_ratio, interest,
+        self.cols[bar].append([total_name, upl_ratio, win_ratio, game_times, interest, positions_weight,
                                record.config['checkSurplus'], record.config['stopLoss']])
 
     # 保存行情数据

@@ -26,6 +26,8 @@ class UserInfo:
         self.avgPx = config['avgPx']  # 开仓均价
         self.availPos = config['initCoin']  # 可平仓数量
         self.lever = config['lever']
+        self.last_buy_count = 0.0  # 上次购买的数量
+        self.last_buy_price = 0.0  # 上次购买时价格
         # 用户资产字段
         self.availBal = config['initFund']  # 用户可用资产
 
@@ -49,7 +51,15 @@ class UserInfo:
         if availPos != None:
             self.availPos = availPos  # 设置可平仓数量
 
+    # 更新上次购买的持仓信息
+    def last_buy_count_price_change(self, price=None, count=None):
+        if count != None:
+            self.last_buy_count = count
+        if price != None:
+            self.last_buy_price = price
+
     # 计算利息
+
     def count_interest(self, time):
         total_interest = self.position_time+time
         if total_interest >= 1:
@@ -82,10 +92,11 @@ class UserInfo:
             availBal = self.availBal - spend  # 剩余可用
 
             availPos = count + self.availPos  # 持仓数量
-            avgPx = real_price if int(self.avgPx) == 0 else (
-                self.avgPx + real_price)/2  # 持仓均价
+            # 持仓均价计算 -start
+            avgPx = (self.last_buy_count*self.last_buy_price +
+                     real_price * count) / (self.last_buy_count+count)
+            # 持仓均价计算 -end
             upl = price * availPos - liability  # 收益
-
             uplRatio = upl / margin_lever   # 收益率
         else:  # 售卖 保证金版本
             real_price = price * (1-self.config['slippage'])  # 出售价格
@@ -99,10 +110,10 @@ class UserInfo:
             service_charge = market_asset * self.config['eatOrder']  # 手续费
             earnings = market_asset - self.liability - service_charge  # 收益
             availBal = earnings + self.availBal + self.margin_lever   # 剩余可用
-
             # 清空持仓时间
             self.position_time = 0.0
 
+        self.last_buy_count_price_change(price=avgPx, count=availPos)
         self.positions_change(
             uplRatio=uplRatio, availPos=availPos, avgPx=avgPx)
         self.account_change(availBal=availBal,
@@ -184,7 +195,7 @@ class Exchange:
     def start_back_test(self):
         # 查询数据库
         sql = 'SELECT * FROM ' + self.table_name + \
-            ' WHERE id_tamp BETWEEN {start_timestamp} AND {end_timestamp}'.format(
+            ' WHERE id_tamp BETWEEN {start_timestamp} AND {end_timestamp} ORDER BY id_tamp ASC'.format(
                 start_timestamp=self.start_timestamp, end_timestamp=self.end_timestamp)
 
         ss_cursor, conn = self.sql_handler.connect(ss_cursor=True)
@@ -199,13 +210,16 @@ class Exchange:
             self.on_tick(tick)
 
     # 购买
-
     def buy(self, count):
         # 用户购买
+        # print('买', self.market.close, 'avgPx', self.user.avgPx,
+        #       'timestamp', self.market.timestamp)
         self.user.user_trading(count=count, price=self.market.close, type=BUY)
 
     # 出售
     def sell(self, count=0):
+        # print('卖', self.market.close, 'avgPx', self.user.avgPx,
+        #       'timestamp', self.market.timestamp)
         if count == 0:
             # 记录胜率(因为需要当前的平均持仓，所以要在售卖动作钱执行)
             self.record.set_win_times_info()
@@ -225,6 +239,8 @@ class Exchange:
         try:
             # 更新当前行情信息
             self.market.update_tick(tick)
+            # 记录用户持仓重量
+            self.record.set_positions_weight()
             # 先更新持仓和用户资产信息
             self.on_account()
             self.on_positions()

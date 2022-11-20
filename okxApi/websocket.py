@@ -53,10 +53,9 @@ class BaseSocketApi:
                                          on_ping=self.ON_PING,
                                          on_error=self.ON_ERROR,
                                          on_close=self.ON_CLOSED)
-        self.ws.run_forever(ping_interval=25, ping_timeout=12                            # delete-start
-                            , http_proxy_host="127.0.0.1",
-                            http_proxy_port=10000, proxy_type='socks5'  # delete-end
-                            )
+        # self.ws.run_forever(ping_interval=25, ping_timeout=12, http_proxy_host="127.0.0.1",
+        # http_proxy_port=10000, proxy_type='socks5')
+        self.ws.run_forever(ping_interval=25, ping_timeout=12)
 
     # 监听长连接
     def connect_sever(self):
@@ -146,6 +145,7 @@ class BaseSocketApi:
     def ON_ERROR(self, ws, *error):
         pass
 
+
 class OkxExchange:
     """衍生业务类
     """
@@ -156,7 +156,7 @@ class OkxExchange:
 
     def create_connect(self):
         self.private = BaseSocketApi(PRI_URL, self.ON_MESSAGE, self.ON_CLOSE)
-        self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE, self.ON_CLOSE) 
+        self.public = BaseSocketApi(PUB_URL, self.ON_MESSAGE, self.ON_CLOSE)
 
     def connect(self):
         self.create_connect()
@@ -293,4 +293,3 @@ class OkxExchange:
             self.private.connect_sever()
             self.private.add_channel(
                 op=EVENT_LOGIN, args=self._get_login_args())
-        
