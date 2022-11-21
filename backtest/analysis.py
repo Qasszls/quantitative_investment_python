@@ -87,7 +87,7 @@ class DataRecordEngine:
 class AnalysisEngine:
     def __init__(self):
         self.Logger: Logger = logging.getLogger()
-        self.columns = ['条目名称', '总收益率', '胜率', '交易次数', '扣息',
+        self.columns = ['条目名称', '总收益率', '胜率', '交易次数', '扣息占总资产比率',
                         '用户持仓风险', '止盈率', '止损率']  # '最大回撤率',
         self.cols = {}
         self.data_length_dict = {}
