@@ -19,8 +19,8 @@ class UserInfo:
         self.liability = config['liability']  # 负债
         self.interest = 0.0  # 利息
         self.position_time = 0.0  # 持仓时间
-        self.stopLoss = config['stopLoss']  # 止损
-        self.checkSurplus = config['checkSurplus']
+        self.stop_loss = config['stop_loss']  # 止损
+        self.check_surplus = config['check_surplus']
         # 持仓字段
         self.uplRatio = 0.0  # 未实现收益率
         self.avgPx = config['avgPx']  # 开仓均价
@@ -103,10 +103,10 @@ class UserInfo:
             market_asset = real_price * self.availPos  # 仓位资产现价
             current_asset = self.avgPx * self.availPos  # 仓位资产买入价
             # 控制亏损
-            # if current_asset != 0 and (market_asset-(current_asset))/(current_asset) <= -self.stopLoss:
-            #     market_asset = (current_asset)*(1-self.stopLoss+0.05)
-            # elif current_asset != 0 and (market_asset-(current_asset))/(current_asset) >=self.checkSurplus:
-            #     market_asset = (current_asset)*(1-self.stopLoss)
+            # if current_asset != 0 and (market_asset-(current_asset))/(current_asset) <= -self.stop_loss:
+            #     market_asset = (current_asset)*(1-self.stop_loss+0.05)
+            # elif current_asset != 0 and (market_asset-(current_asset))/(current_asset) >=self.check_surplus:
+            #     market_asset = (current_asset)*(1-self.stop_loss)
             service_charge = market_asset * self.config['eatOrder']  # 手续费
             earnings = market_asset - self.liability - service_charge  # 收益
             availBal = earnings + self.availBal + self.margin_lever   # 剩余可用

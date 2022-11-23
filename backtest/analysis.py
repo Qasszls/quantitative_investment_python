@@ -113,7 +113,7 @@ class AnalysisEngine:
         if bar not in self.cols:
             self.cols[bar] = []
         self.cols[bar].append([total_name, upl_ratio, win_ratio, game_times, interest, positions_weight,
-                               record.config['checkSurplus'], record.config['stopLoss']])
+                               record.config['check_surplus'], record.config['stop_loss']])
 
     # 保存行情数据
     def save_record(self, record: DataRecordEngine):
@@ -131,10 +131,10 @@ class AnalysisEngine:
             bar_config, base_config)
         # 循环采样止盈率
         config_group = self._get_config_group(
-            config_group, cs_scope, 'checkSurplus')
+            config_group, cs_scope, 'check_surplus')
         # 循环采样止损率
         config_group = self._get_config_group(
-            config_group, sl_scope, 'stopLoss')
+            config_group, sl_scope, 'stop_loss')
 
         # 计算各个粒度会被测量的数量总和
         self._set_data_length_dict(bar_config=bar_config,

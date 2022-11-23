@@ -25,8 +25,8 @@ BASE_CONFIG = {
     # "start_timestamp": "2016-10-1 00:00:00",
     "start_timestamp": "2021-9-1 00:00:00",
     "end_timestamp": "2022-11-6 00:00:00",
-    "checkSurplus": 0.322,  # 默认止盈
-    "stopLoss": 0.169,  # 默认止损
+    "check_surplus": 0.322,  # 默认止盈
+    "stop_loss": 0.169,  # 默认止损
 
     # "bar": "1H",  # 粒度
     # "table_name": "BTC_USDT_1H",

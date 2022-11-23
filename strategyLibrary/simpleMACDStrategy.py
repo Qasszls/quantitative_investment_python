@@ -87,8 +87,8 @@ class SimpleMacd():
             'macd_data': macd_data,
             "step": self.step
         })
-    # 本级别研判
 
+    # 本级别研判
     def medium_read(self, close_price, todayMacd):
         dif = todayMacd['dif']
         # 研判模块
