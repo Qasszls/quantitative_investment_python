@@ -1,19 +1,22 @@
 {
-  "symbol": "BTC-USDT",
-  "realPay":{
-      "host":"https://www.okx.com",
-      "api_key" :"bdedd431-4ee7-494b-b539-cc10f1a1cdef",
-      "secret_key" :"7619D4450F512E462CEE4C0579E083F3",
-      "passphrase" :"Qass-utf-8", 
-      "table_name":"realPay_15m",
-      "name":"realPay",
-      "note":"主账户",
-      "market_lv":"candle1H",
-      "trading_type":"1", 
-      "symbol": "BTC-USDT",
-      "subscribe": {
-        "private":["positions","account"],
-        "public":["market"]
-      }
+  "realPay": {
+    "host": "https://www.okx.com",
+    "api_key": "bdedd431-4ee7-494b-b539-cc10f1a1cdef",
+    "secret_key": "7619D4450F512E462CEE4C0579E083F3",
+    "passphrase": "Qass-utf-8",
+    "name": "realPay",
+    "check_surplus": 0.28,
+    "stop_loss": 0.72,
+    "ema12":0,
+    "ema26":0,
+    "dea":0,
+    "note": "主账户",
+    "market_lv": "candle1H",
+    "trading_type": "1",
+    "symbol": "BTC-USDT",
+    "subscribe": {
+      "private": ["positions", "account"],
+      "public": ["market"]
+    }
   }
 }

@@ -25,8 +25,8 @@ class TradingEngine:
         self.timestamp = Timestamp()  # 初始化时间操作对象
         self.exchange = exchange  # 交易所引擎
 
-        self.checkSurplus = config['checkSurplus']  # 玩家止盈率
-        self.stopLoss = config['stopLoss']  # 玩家止损率
+        self.check_surplus = config['check_surplus']  # 玩家止盈率
+        self.stop_loss = config['stop_loss']  # 玩家止损率
         self.lever = 10  # 杠杆倍数
         self.update_times = 0
         self.tick_times = 0
@@ -73,17 +73,17 @@ class TradingEngine:
             earnings = data[0]
             uplRatio = float(earnings['uplRatio'])
 
-            def _is_checkSurplus():
-                return uplRatio >= self.checkSurplus
+            def _is_check_surplus():
+                return uplRatio >= self.check_surplus
 
-            def _is_sotpLoss():
+            def _is_stop_loss():
                 if uplRatio <= 0:
-                    return abs(uplRatio) >= self.stopLoss
+                    return abs(uplRatio) >= self.stop_loss
                 else:
                     return False
 
             # 检测止盈止损
-            if _is_checkSurplus() or _is_sotpLoss():
+            if _is_check_surplus() or _is_stop_loss():
                 self.allSell()
 
     def breathing(self, kline_event):
@@ -100,7 +100,7 @@ class TradingEngine:
 
             _k.columns = [
                 'id_tamp', 'open_price', 'high_price', 'lowest_price',
-                'close_price', 'vol', 'volCcy', 'volCcyQuote'
+                'close_price', 'vol', 'volCcy', 'volCcyQuote', 'confirm'
             ]
             KLINE_DATA = _k.to_dict('records')[0]
             # 准备数据-macd

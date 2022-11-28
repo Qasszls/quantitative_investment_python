@@ -127,9 +127,9 @@ class test_backtest_trading(unittest.TestCase):
             cs_scope)*len(bar_config) * get_length(sl_scope)
 
         expect_check_surplus = [1, 1, 2, 2, 1, 1, 2, 2]
-        check_surplus_list = get_list_type(config_group, 'checkSurplus')
+        check_surplus_list = get_list_type(config_group, 'check_surplus')
         expect_stop_loss = [0.5, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.0]
-        stop_loss_list = get_list_type(config_group, 'stopLoss')
+        stop_loss_list = get_list_type(config_group, 'stop_loss')
 
         self.assertTrue(len(config_group) == expect_length, msg="回测配置数据错误：{error}, 预期数据为{expect}".format(
             error=len(config_group), expect=expect_length))

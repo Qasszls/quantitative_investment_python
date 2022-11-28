@@ -10,7 +10,8 @@ from share.TimeStamp import Timestamp
 from strategyLibrary.simpleMACDStrategy import SimpleMacd
 from events.engine import EventEngine, Event
 from events.event import EVENT_TICK, EVENT_POSITION, EVENT_COMPUTED, EVENT_DING, EVENT_LOG
-from logging import INFO
+from logging import INFO, Logger
+import logging
 
 
 class Trading:
@@ -26,19 +27,20 @@ class Trading:
         self.event_engine = event_engine
         self.http = http
 
-        self.checkSurplus = 0.11  # 玩家止盈率
-        self.stopLoss = 0.07  # 玩家止损率
+        self.check_surplus = user_info['check_surplus']  # 玩家止盈率
+        self.stop_loss = user_info['stop_loss']  # 玩家止损率
         self.lever = 10  # 杠杆倍数
         self.update_times = 0
 
-        self.simpleMacd = SimpleMacd(self.computed)
+        self.simple_macd = SimpleMacd(self.computed)
+        self.logger: Logger = logging.getLogger()
 
         # 内部变量
         self.buy_times = 0
         # 15m
-        self.ema12 = 0
-        self.ema26 = 0
-        self.dea = 0
+        self.ema12 = user_info['ema12'] or 0
+        self.ema26 = user_info['ema26'] or 0
+        self.dea = user_info['dea'] or 0
         self.old_kl = []
 
         self.okex_api_info = {
@@ -74,35 +76,34 @@ class Trading:
             earnings = data[0]
             uplRatio = float(earnings['uplRatio'])
 
-            def _is_checkSurplus():
-                return uplRatio >= self.checkSurplus
+            def _is_check_surplus():
+                return uplRatio >= self.check_surplus
 
-            def _is_sotpLoss():
-                return abs(uplRatio) >= self.stopLoss
+            def _is_stop_loss():
+                return abs(uplRatio) >= self.stop_loss
 
             # 检测止盈止损
-            if _is_checkSurplus() or _is_sotpLoss():
+            if _is_check_surplus() or _is_stop_loss():
                 self.allSell()
 
     def breathing(self, kline_event):
         kline_data = kline_event.data['data'][0]
         # 判断新老数据
         # 第一次进入循环 或者 同一时间的老数据，都会进入
-        if kline_data[0] in self.old_kl:
+        if kline_data[0] in self.old_kl or len(self.old_kl) == 0:
             # 其实可以完全不写下面的代码，但是意义就不一样了。
             self.old_kl = kline_data
-            return
         else:
             _k = pd.DataFrame([kline_data]).astype(float)
             _k.columns = [
                 'id_tamp', 'open_price', 'high_price', 'lowest_price',
-                'close_price', 'vol', 'volCcy', 'volCcyQuote'
+                'close_price', 'vol', 'volCcy', 'volCcyQuote', 'confirm'
             ]
             KLINE_DATA = _k.to_dict('records')[0]
             # 准备数据-macd
             MACD_DATA = self._befor_investment(KLINE_DATA)
             # 运行策略 *********** door **************
-            self.simpleMacd.runStrategy(
+            self.simple_macd.runStrategy(
                 KLINE_DATA,
                 MACD_DATA
             )
@@ -112,15 +113,17 @@ class Trading:
 
     def onCalculate(self, res):
         # 变量定义
-        None
+        pass
 
     # 钩子函数 计算完成
     def computed(self, data):
         medium_status = data['medium_status']  # 初级判断状态
         kline_data = data['kline_data']  # k线数据包
-        # macd_data = data['macd_data']  # macd数据包
+        macd_data = data['macd_data']  # macd数据包
         _step = data['step']  # 策略执行步骤
-
+        self.log(macd_data)
+        self.log(kline_data)
+        self.log(_step)
         id_tamp = kline_data['id_tamp']  # 时间戳
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,买卖区间起点：' +
                           self.timestamp.get_time_normal(id_tamp))
@@ -219,8 +222,6 @@ class Trading:
 
 
 # 工具查询---buy/sell阶段-数量
-
-
     def _set_lever(self):
         self.log('杠杆配置中')
         # 设置杠杆倍数 交易前配置
@@ -268,5 +269,4 @@ class Trading:
 
     def log(self, msg, level=INFO):
         data = {'msg': msg, 'level': level}
-        event: Event = Event(EVENT_LOG, data)
-        self.event_engine.put(event)
+        self.logger.log(**data)

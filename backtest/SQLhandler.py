@@ -103,7 +103,7 @@ class Sql(BaseSql):
     # 插入表内容
     def insert_kline_data(self, data, table):
         sql = "INSERT IGNORE INTO "+table + \
-            "(id_tamp, open_price, high_price, lowest_price, close_price, vol, volCcy, volCcyQuote) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            "(id_tamp, open_price, high_price, lowest_price, close_price, vol, volCcy, volCcyQuote, confirm) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         params_list = []
         for item in data:
             params_list.append((item[0], item[1], item[2],
@@ -113,7 +113,7 @@ class Sql(BaseSql):
     # 创建表
     def create_table(self, table_name):
         sql = "CREATE TABLE "+table_name + \
-            "(id_tamp BIGINT(50) PRIMARY KEY, open_price VARCHAR(100), high_price VARCHAR(100), lowest_price VARCHAR(100), close_price VARCHAR(100), vol VARCHAR(100), volCcy VARCHAR(100), volCcyQuote VARCHAR(100))"
+            "(id_tamp BIGINT(50) PRIMARY KEY, open_price VARCHAR(100), high_price VARCHAR(100), lowest_price VARCHAR(100), close_price VARCHAR(100), vol VARCHAR(100), volCcy VARCHAR(100), volCcyQuote VARCHAR(100), confirm VARCHAR(100))"
 
         return self._commit(sql)
 
