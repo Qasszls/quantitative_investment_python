@@ -119,11 +119,8 @@ class Trading:
     def computed(self, data):
         medium_status = data['medium_status']  # 初级判断状态
         kline_data = data['kline_data']  # k线数据包
-        macd_data = data['macd_data']  # macd数据包
+        # macd_data = data['macd_data']  # macd数据包
         _step = data['step']  # 策略执行步骤
-        self.log(macd_data)
-        self.log(kline_data)
-        self.log(_step)
         id_tamp = kline_data['id_tamp']  # 时间戳
         self.dingding_msg('已完成，步骤：' + str(_step) + ' ,买卖区间起点：' +
                           self.timestamp.get_time_normal(id_tamp))
